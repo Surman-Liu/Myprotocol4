@@ -29,18 +29,18 @@
  * US Department of Defense (DoD), and ITTC at The University of Kansas.
  */
 
-#ifndef DSDV_PACKETQUEUE_H
-#define DSDV_PACKETQUEUE_H
+#ifndef MYPROTOCOL_PACKETQUEUE_H
+#define MYPROTOCOL_PACKETQUEUE_H
 
 #include <vector>
 #include "ns3/ipv4-routing-protocol.h"
 #include "ns3/simulator.h"
 
 namespace ns3 {
-namespace dsdv {
+namespace myprotocol {
 /**
- * \ingroup dsdv
- * \brief DSDV Queue Entry
+ * \ingroup myprotocol
+ * \brief myprotocol Queue Entry
  */
 class QueueEntry
 {
@@ -173,8 +173,8 @@ private:
   Time m_expire;
 };
 /**
- * \ingroup dsdv
- * \brief DSDV Packet queue
+ * \ingroup myprotocol
+ * \brief myprotocol Packet queue
  *
  * When a route is not available, the packets are queued. Every node can buffer up to 5 packets per
  * destination. We have implemented a "drop front on full" queue where the first queued packet will be dropped
@@ -304,4 +304,4 @@ private:
 };
 }
 }
-#endif /* DSDV_PACKETQUEUE_H */
+#endif /* myprotocol_PACKETQUEUE_H */

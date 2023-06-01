@@ -28,7 +28,7 @@
  * NSF grant CNS-1050226 (Multilayer Network Resilience Analysis and Experimentation on GENI),
  * US Department of Defense (DoD), and ITTC at The University of Kansas.
  */
-#include "dsdv-packet-queue.h"
+#include "myprotocol-packet-queue.h"
 #include <algorithm>
 #include <functional>
 #include "ns3/ipv4-route.h"
@@ -37,9 +37,9 @@
 
 namespace ns3 {
 
-NS_LOG_COMPONENT_DEFINE ("DsdvPacketQueue");
+NS_LOG_COMPONENT_DEFINE ("MyprotocolPacketQueue");
 
-namespace dsdv {
+namespace myprotocol {
 uint32_t
 PacketQueue::GetSize ()
 {

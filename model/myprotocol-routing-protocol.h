@@ -30,12 +30,12 @@
  * US Department of Defense (DoD), and ITTC at The University of Kansas.
  */
 
-#ifndef DSDV_ROUTING_PROTOCOL_H
-#define DSDV_ROUTING_PROTOCOL_H
+#ifndef MYPROTOCOL_ROUTING_PROTOCOL_H
+#define MYPROTOCOL_ROUTING_PROTOCOL_H
 
-#include "dsdv-rtable.h"
-#include "dsdv-packet-queue.h"
-#include "dsdv-packet.h"
+#include "myprotocol-rtable.h"
+#include "myprotocol-packet-queue.h"
+#include "myprotocol-packet.h"
 #include "ns3/node.h"
 #include "ns3/random-variable-stream.h"
 #include "ns3/ipv4-routing-protocol.h"
@@ -44,11 +44,11 @@
 #include "ns3/output-stream-wrapper.h"
 
 namespace ns3 {
-namespace dsdv {
+namespace myprotocol {
 
 /**
- * \ingroup dsdv
- * \brief DSDV routing protocol.
+ * \ingroup myprotocol
+ * \brief myprotocol routing protocol.
  */
 class RoutingProtocol : public Ipv4RoutingProtocol
 {
@@ -58,7 +58,7 @@ public:
    * \return the object TypeId
    */
   static TypeId GetTypeId (void);
-  static const uint32_t DSDV_PORT;
+  static const uint32_t MYPROTOCOL_PORT;
 
   /// c-tor
   RoutingProtocol ();
@@ -210,13 +210,13 @@ private:
   Ptr<Socket>
   FindSocketWithInterfaceAddress (Ipv4InterfaceAddress iface) const;
 
-  // Receive dsdv control packets
+  // Receive myprotocol control packets
   /**
-   * Receive and process dsdv control packet
-   * \param socket the socket for receiving dsdv control packets
+   * Receive and process myprotocol control packet
+   * \param socket the socket for receiving myprotocol control packets
    */
   void
-  RecvDsdv (Ptr<Socket> socket);
+  RecvMyprotocol (Ptr<Socket> socket);
   /// Send packet
   void
   Send (Ptr<Ipv4Route>, Ptr<const Packet>, const Ipv4Header &);
@@ -260,4 +260,4 @@ private:
 }
 }
 
-#endif /* DSDV_ROUTING_PROTOCOL_H */
+#endif /* MYPROTOCOL_ROUTING_PROTOCOL_H */

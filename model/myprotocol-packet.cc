@@ -15,7 +15,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * Authors: Hemanth Narra <hemanth@ittc.ku.com>, written after OlsrHelper by Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
+ * Author: Hemanth Narra <hemanth@ittc.ku.com>
  *
  * James P.G. Sterbenz <jpgs@ittc.ku.edu>, director
  * ResiliNets Research Group  http://wiki.ittc.ku.edu/resilinets
@@ -28,40 +28,77 @@
  * NSF grant CNS-1050226 (Multilayer Network Resilience Analysis and Experimentation on GENI),
  * US Department of Defense (DoD), and ITTC at The University of Kansas.
  */
-#include "dsdv-helper.h"
-#include "ns3/dsdv-routing-protocol.h"
-#include "ns3/node-list.h"
-#include "ns3/names.h"
-#include "ns3/ipv4-list-routing.h"
+#include "myprotocol-packet.h"
+#include "ns3/address-utils.h"
+#include "ns3/packet.h"
 
 namespace ns3 {
-DsdvHelper::~DsdvHelper ()
+namespace myprotocol {
+
+NS_OBJECT_ENSURE_REGISTERED (MyprotocolHeader);
+
+MyprotocolHeader::MyprotocolHeader (Ipv4Address dst, uint32_t hopCount, uint32_t dstSeqNo)
+  : m_dst (dst),
+    m_hopCount (hopCount),
+    m_dstSeqNo (dstSeqNo)
 {
 }
 
-DsdvHelper::DsdvHelper () : Ipv4RoutingHelper ()
+MyprotocolHeader::~MyprotocolHeader ()
 {
-  m_agentFactory.SetTypeId ("ns3::dsdv::RoutingProtocol");
 }
 
-DsdvHelper*
-DsdvHelper::Copy (void) const
+TypeId
+MyprotocolHeader::GetTypeId (void)
 {
-  return new DsdvHelper (*this);
+  static TypeId tid = TypeId ("ns3::myprotocol::MyprotocolHeader")
+    .SetParent<Header> ()
+    .SetGroupName ("Myprotocol")
+    .AddConstructor<MyprotocolHeader> ();
+  return tid;
 }
 
-Ptr<Ipv4RoutingProtocol>
-DsdvHelper::Create (Ptr<Node> node) const
+TypeId
+MyprotocolHeader::GetInstanceTypeId () const
 {
-  Ptr<dsdv::RoutingProtocol> agent = m_agentFactory.Create<dsdv::RoutingProtocol> ();
-  node->AggregateObject (agent);
-  return agent;
+  return GetTypeId ();
+}
+
+uint32_t
+MyprotocolHeader::GetSerializedSize () const
+{
+  return 12;
 }
 
 void
-DsdvHelper::Set (std::string name, const AttributeValue &value)
+MyprotocolHeader::Serialize (Buffer::Iterator i) const
 {
-  m_agentFactory.Set (name, value);
+  WriteTo (i, m_dst);
+  i.WriteHtonU32 (m_hopCount);
+  i.WriteHtonU32 (m_dstSeqNo);
+
 }
 
+uint32_t
+MyprotocolHeader::Deserialize (Buffer::Iterator start)
+{
+  Buffer::Iterator i = start;
+
+  ReadFrom (i, m_dst);
+  m_hopCount = i.ReadNtohU32 ();
+  m_dstSeqNo = i.ReadNtohU32 ();
+
+  uint32_t dist = i.GetDistanceFrom (start);
+  NS_ASSERT (dist == GetSerializedSize ());
+  return dist;
+}
+
+void
+MyprotocolHeader::Print (std::ostream &os) const
+{
+  os << "DestinationIpv4: " << m_dst
+     << " Hopcount: " << m_hopCount
+     << " SequenceNumber: " << m_dstSeqNo;
+}
+}
 }

@@ -1,29 +1,29 @@
 ## -*- Mode: python; py-indent-offset: 4; indent-tabs-mode: nil; coding: utf-8; -*-
 
 def build(bld):
-    module = bld.create_ns3_module('dsdv', ['internet'])
+    module = bld.create_ns3_module('myprotocol', ['internet'])
     module.includes = '.'
     module.source = [
-        'model/dsdv-rtable.cc',
-        'model/dsdv-packet-queue.cc',
-        'model/dsdv-packet.cc',
-        'model/dsdv-routing-protocol.cc',
-        'helper/dsdv-helper.cc',
+        'model/myprotocol-rtable.cc',
+        'model/myprotocol-packet-queue.cc',
+        'model/myprotocol-packet.cc',
+        'model/myprotocol-routing-protocol.cc',
+        'helper/myprotocol-helper.cc',
         ]
 
-    module_test = bld.create_ns3_module_test_library('dsdv')
-    module_test.source = [
-        'test/dsdv-testcase.cc',
-        ]
+    # module_test = bld.create_ns3_module_test_library('myprotocol')
+    # module_test.source = [
+    #     'test/myprotocol-testcase.cc',
+    #     ]
 
     headers = bld(features='ns3header')
-    headers.module = 'dsdv'
+    headers.module = 'myprotocol'
     headers.source = [
-        'model/dsdv-rtable.h',
-        'model/dsdv-packet-queue.h',
-        'model/dsdv-packet.h',
-        'model/dsdv-routing-protocol.h',
-        'helper/dsdv-helper.h',
+        'model/myprotocol-rtable.h',
+        'model/myprotocol-packet-queue.h',
+        'model/myprotocol-packet.h',
+        'model/myprotocol-routing-protocol.h',
+        'helper/myprotocol-helper.h',
         ]
     if (bld.env['ENABLE_EXAMPLES']):
       bld.recurse('examples')

@@ -28,16 +28,16 @@
  * NSF grant CNS-1050226 (Multilayer Network Resilience Analysis and Experimentation on GENI),
  * US Department of Defense (DoD), and ITTC at The University of Kansas.
  */
-#include "dsdv-rtable.h"
+#include "myprotocol-rtable.h"
 #include "ns3/simulator.h"
 #include <iomanip>
 #include "ns3/log.h"
 
 namespace ns3 {
 
-NS_LOG_COMPONENT_DEFINE ("DsdvRoutingTable");
+NS_LOG_COMPONENT_DEFINE ("MyprotocolRoutingTable");
 
-namespace dsdv {
+namespace myprotocol {
 RoutingTableEntry::RoutingTableEntry (Ptr<NetDevice> dev,
                                       Ipv4Address dst,
                                       uint32_t seqNo,
@@ -251,7 +251,7 @@ RoutingTable::Purge (std::map<Ipv4Address, RoutingTableEntry> & removedAddresses
 void
 RoutingTable::Print (Ptr<OutputStreamWrapper> stream) const
 {
-  *stream->GetStream () << "\nDSDV Routing table\n" << "Destination\t\tGateway\t\tInterface\t\tHopCount\t\tSeqNum\t\tLifeTime\t\tSettlingTime\n";
+  *stream->GetStream () << "\n myprotocol Routing table\n" << "Destination\t\tGateway\t\tInterface\t\tHopCount\t\tSeqNum\t\tLifeTime\t\tSettlingTime\n";
   for (std::map<Ipv4Address, RoutingTableEntry>::const_iterator i = m_ipv4AddressEntry.begin (); i
        != m_ipv4AddressEntry.end (); ++i)
     {

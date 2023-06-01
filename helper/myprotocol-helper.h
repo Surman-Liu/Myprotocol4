@@ -29,8 +29,8 @@
  * US Department of Defense (DoD), and ITTC at The University of Kansas.
  */
 
-#ifndef DSDV_HELPER_H
-#define DSDV_HELPER_H
+#ifndef MYPROTOCOL_HELPER_H
+#define MYPROTOCOL_HELPER_H
 
 #include "ns3/object-factory.h"
 #include "ns3/node.h"
@@ -39,21 +39,21 @@
 
 namespace ns3 {
 /**
- * \ingroup dsdv
- * \brief Helper class that adds DSDV routing to nodes.
+ * \ingroup myprotocol
+ * \brief Helper class that adds myprotocol routing to nodes.
  */
-class DsdvHelper : public Ipv4RoutingHelper
+class MyprotocolHelper : public Ipv4RoutingHelper
 {
 public:
-  DsdvHelper ();
-  ~DsdvHelper ();
+  MyprotocolHelper ();
+  ~MyprotocolHelper ();
   /**
-   * \returns pointer to clone of this DsdvHelper
+   * \returns pointer to clone of this MyprotocolHelper
    *
    * This method is mainly for internal use by the other helpers;
    * clients are expected to free the dynamic memory allocated by this method
    */
-  DsdvHelper* Copy (void) const;
+  MyprotocolHelper* Copy (void) const;
 
   /**
    * \param node the node on which the routing protocol will run
@@ -67,7 +67,7 @@ public:
    * \param name the name of the attribute to set
    * \param value the value of the attribute to set.
    *
-   * This method controls the attributes of ns3::dsdv::RoutingProtocol
+   * This method controls the attributes of ns3::myprotocol::RoutingProtocol
    */
   void Set (std::string name, const AttributeValue &value);
 
@@ -77,4 +77,4 @@ private:
 
 }
 
-#endif /* DSDV_HELPER_H */
+#endif /* MYPROTOCOL_HELPER_H */

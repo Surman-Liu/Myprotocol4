@@ -29,8 +29,8 @@
  * US Department of Defense (DoD), and ITTC at The University of Kansas.
  */
 
-#ifndef DSDV_PACKET_H
-#define DSDV_PACKET_H
+#ifndef MYPROTOCOL_PACKET_H
+#define MYPROTOCOL_PACKET_H
 
 #include <iostream>
 #include "ns3/header.h"
@@ -38,10 +38,10 @@
 #include "ns3/nstime.h"
 
 namespace ns3 {
-namespace dsdv {
+namespace myprotocol {
 /**
- * \ingroup dsdv
- * \brief DSDV Update Packet Format
+ * \ingroup myprotocol
+ * \brief myprotocol Update Packet Format
  * \verbatim
  |      0        |      1        |      2        |       3       |
   0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7
@@ -55,7 +55,7 @@ namespace dsdv {
  * \endverbatim
  */
 
-class DsdvHeader : public Header
+class MyprotocolHeader : public Header
 {
 public:
   /**
@@ -65,8 +65,8 @@ public:
    * \param hopcount hop count
    * \param dstSeqNo destination sequence number
    */
-  DsdvHeader (Ipv4Address dst = Ipv4Address (), uint32_t hopcount = 0, uint32_t dstSeqNo = 0);
-  virtual ~DsdvHeader ();
+  MyprotocolHeader (Ipv4Address dst = Ipv4Address (), uint32_t hopcount = 0, uint32_t dstSeqNo = 0);
+  virtual ~MyprotocolHeader ();
   /**
    * \brief Get the type ID.
    * \return the object TypeId
@@ -137,7 +137,7 @@ private:
   uint32_t m_hopCount; ///< Number of Hops
   uint32_t m_dstSeqNo; ///< Destination Sequence Number
 };
-static inline std::ostream & operator<< (std::ostream& os, const DsdvHeader & packet)
+static inline std::ostream & operator<< (std::ostream& os, const MyprotocolHeader & packet)
 {
   packet.Print (os);
   return os;
@@ -145,4 +145,4 @@ static inline std::ostream & operator<< (std::ostream& os, const DsdvHeader & pa
 }
 }
 
-#endif /* DSDV_PACKET_H */
+#endif /* MYPROTOCOL_PACKET_H */
