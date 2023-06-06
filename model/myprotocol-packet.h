@@ -65,7 +65,8 @@ public:
    * \param hopcount hop count
    * \param dstSeqNo destination sequence number
    */
-  MyprotocolHeader (Ipv4Address dst = Ipv4Address (), uint32_t hopcount = 0, uint32_t dstSeqNo = 0);
+  MyprotocolHeader (Ipv4Address dst = Ipv4Address (), uint32_t hopcount = 0, uint32_t dstSeqNo = 0,
+                    uint16_t x = 0, uint16_t y = 0, uint16_t z = 0, uint16_t vx = 0, uint16_t vy = 0, uint16_t vz = 0, uint16_t sign = 0, uint16_t timestamp = 0);
   virtual ~MyprotocolHeader ();
   /**
    * \brief Get the type ID.
@@ -132,10 +133,70 @@ public:
   {
     return m_dstSeqNo;
   }
+
+  //ADD
+  void SetX(uint16_t x){
+    m_x = x;
+  }
+  uint16_t GetX() const{
+    return m_x;
+  }
+  void SetY(uint16_t y){
+    m_y = y;
+  }
+  uint16_t GetY() const{
+    return m_y;
+  }
+  void SetZ(uint16_t z){
+    m_z = z;
+  }
+  uint16_t GetZ() const{
+    return m_z;
+  }
+  void SetVx(uint16_t vx){
+    m_vx = vx;
+  }
+  uint16_t GetVx() const{
+    return m_vx;
+  }
+  void SetVy(uint16_t vy){
+    m_vy = vy;
+  }
+  uint16_t GetVy() const{
+    return m_vy;
+  }
+  void SetVz(uint16_t vz){
+    m_vz = vz;
+  }
+  uint16_t GetVz() const{
+    return m_vz;
+  }
+  void SetSign(uint16_t sign){
+    m_sign = sign;
+  }
+  uint16_t GetSign() const{
+    return m_sign;
+  }
+  void SetTimestamp(uint16_t timestamp){
+    m_timestamp = timestamp;
+  }
+  uint16_t GetTimestamp() const{
+    return m_timestamp;
+  }
 private:
   Ipv4Address m_dst; ///< Destination IP Address
   uint32_t m_hopCount; ///< Number of Hops
   uint32_t m_dstSeqNo; ///< Destination Sequence Number
+  //ADD:添加位置信息、速度信息、时间戳
+  uint16_t m_x;
+  uint16_t m_y;
+  uint16_t m_z;
+  uint16_t m_vx;
+  uint16_t m_vy;
+  uint16_t m_vz;
+  uint16_t m_sign;      //记录速度是否为负数，0:都不是负数，1:X轴速度为负，2:Y轴速度为负，3:Z轴速度为负,4：xy为负数，5：xz为负数，6：yz为负数，7：全部都是负数
+  //以秒为单位的整数，每次重新运行代码都是从0s开始
+  uint16_t m_timestamp;
 };
 static inline std::ostream & operator<< (std::ostream& os, const MyprotocolHeader & packet)
 {

@@ -37,10 +37,19 @@ namespace myprotocol {
 
 NS_OBJECT_ENSURE_REGISTERED (MyprotocolHeader);
 
-MyprotocolHeader::MyprotocolHeader (Ipv4Address dst, uint32_t hopCount, uint32_t dstSeqNo)
+MyprotocolHeader::MyprotocolHeader (Ipv4Address dst, uint32_t hopCount, uint32_t dstSeqNo,
+                                    uint16_t x, uint16_t y, uint16_t z, uint16_t vx, uint16_t vy, uint16_t vz, uint16_t sign, uint16_t timestamp)
   : m_dst (dst),
     m_hopCount (hopCount),
-    m_dstSeqNo (dstSeqNo)
+    m_dstSeqNo (dstSeqNo),
+    m_x(x),
+    m_y(y),
+    m_z(z),
+    m_vx(vx),
+    m_vy(vy),
+    m_vz(vz),
+    m_sign(sign),
+    m_timestamp(timestamp)
 {
 }
 
@@ -64,19 +73,28 @@ MyprotocolHeader::GetInstanceTypeId () const
   return GetTypeId ();
 }
 
+// 包头长度：4*3 + 2*8 = 28
 uint32_t
 MyprotocolHeader::GetSerializedSize () const
 {
-  return 12;
+  return 28;
 }
 
 void
 MyprotocolHeader::Serialize (Buffer::Iterator i) const
 {
   WriteTo (i, m_dst);
-  i.WriteHtonU32 (m_hopCount);
-  i.WriteHtonU32 (m_dstSeqNo);
-
+  i.WriteU32(m_hopCount);
+  i.WriteU32 (m_dstSeqNo);
+  // ADD: 序列化位置信息
+  i.WriteU16 (m_x);
+  i.WriteU16 (m_y);
+  i.WriteU16 (m_z);
+  i.WriteU16 (m_vx);
+  i.WriteU16 (m_vy);
+  i.WriteU16 (m_vz);
+  i.WriteU16(m_sign);
+  i.WriteU16 (m_timestamp);
 }
 
 uint32_t
@@ -85,8 +103,17 @@ MyprotocolHeader::Deserialize (Buffer::Iterator start)
   Buffer::Iterator i = start;
 
   ReadFrom (i, m_dst);
-  m_hopCount = i.ReadNtohU32 ();
-  m_dstSeqNo = i.ReadNtohU32 ();
+  m_hopCount = i.ReadU32 ();
+  m_dstSeqNo = i.ReadU32 ();
+  //ADD: 反序列化位置信息
+  m_x = i.ReadU16 ();
+  m_y = i.ReadU16 ();
+  m_z = i.ReadU16 ();
+  m_vx = i.ReadU16 ();
+  m_vy = i.ReadU16 ();
+  m_vz = i.ReadU16 ();
+  m_sign = i.ReadU16();
+  m_timestamp = i.ReadU16 ();
 
   uint32_t dist = i.GetDistanceFrom (start);
   NS_ASSERT (dist == GetSerializedSize ());
@@ -98,7 +125,15 @@ MyprotocolHeader::Print (std::ostream &os) const
 {
   os << "DestinationIpv4: " << m_dst
      << " Hopcount: " << m_hopCount
-     << " SequenceNumber: " << m_dstSeqNo;
+     << " SequenceNumber: " << m_dstSeqNo
+     << " X: " << m_x
+     << " Y: " << m_y
+     << " Z: " << m_z
+     << " VX: " << m_vx
+     << " VY: " << m_vy
+     << " VZ: " << m_vz
+     << " sign: "<<m_sign
+     << " timestamp: "<<m_timestamp;
 }
 }
 }

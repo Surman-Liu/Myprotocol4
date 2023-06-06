@@ -69,9 +69,11 @@ public:
    * \param SettlingTime the settling time
    * \param changedEntries flag for changed entries
    */
+  // ADD:在构造函数中添加位置、速度、时间戳
   RoutingTableEntry (Ptr<NetDevice> dev = 0, Ipv4Address dst = Ipv4Address (), uint32_t seqNo = 0,
                      Ipv4InterfaceAddress iface = Ipv4InterfaceAddress (), uint32_t hops = 0, Ipv4Address nextHop = Ipv4Address (),
-                     Time lifetime = Simulator::Now (), Time SettlingTime = Simulator::Now (), bool changedEntries = false);
+                     Time lifetime = Simulator::Now (), Time SettlingTime = Simulator::Now (), bool changedEntries = false,
+                     uint16_t x = 0,uint16_t y = 0,uint16_t z = 0, int16_t vx = 0,int16_t vy = 0,int16_t vz = 0, uint16_t timestamp = 0);
 
   ~RoutingTableEntry ();
   /**
@@ -280,6 +282,50 @@ public:
   void
   Print (Ptr<OutputStreamWrapper> stream) const;
 
+  //ADD
+  void SetX(uint16_t x){
+    m_x = x;
+  }
+  uint16_t GetX() const{
+    return m_x;
+  }
+  void SetY(uint16_t y){
+    m_y = y;
+  }
+  uint16_t GetY() const{
+    return m_y;
+  }
+  void SetZ(uint16_t z){
+    m_z = z;
+  }
+  uint16_t GetZ() const{
+    return m_z;
+  }
+  void SetVx(int16_t vx){
+    m_vx = vx;
+  }
+  int16_t GetVx() const{
+    return m_vx;
+  }
+  void SetVy(int16_t vy){
+    m_vy = vy;
+  }
+  int16_t GetVy() const{
+    return m_vy;
+  }
+  void SetVz(int16_t vz){
+    m_vz = vz;
+  }
+  int16_t GetVz() const{
+    return m_vz;
+  }
+  void SetTimestamp(uint16_t timestamp){
+    m_timestamp = timestamp;
+  }
+  uint16_t GetTimestamp() const{
+    return m_timestamp;
+  }
+
 private:
   // Fields
   /// Destination Sequence Number
@@ -310,6 +356,14 @@ private:
   /// Flag to show if any of the routing table entries were changed with the routing update.
   uint32_t m_entriesChanged;
 
+  //ADD: 当前位置、速度、时间戳
+  uint16_t m_x;
+  uint16_t m_y;
+  uint16_t m_z;
+  int16_t m_vx;
+  int16_t m_vy;
+  int16_t m_vz;
+  uint16_t m_timestamp;
 };
 
 /**

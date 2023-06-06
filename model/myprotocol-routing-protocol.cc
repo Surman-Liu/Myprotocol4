@@ -372,7 +372,7 @@ RoutingProtocol::DeferredRouteOutput (Ptr<const Packet> p,
     }
 }
 
-// 只转发数据包,并且会在规定的数据包长度前面再加上8个字节，但是他只是转发别人的数据包，当自己要主动发出数据包的时候，不过调用这个函数。
+// 只转发数据包,并且会在规定的数据包长度前面再加上8个字节，但是他只是转发别人的数据包，当自己要主动发出数据包的时候，不调用这个函数。
 bool
 RoutingProtocol::RouteInput (Ptr<const Packet> p,
                              const Ipv4Header &header,
@@ -569,7 +569,8 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
   NS_LOG_FUNCTION (m_mainAddress << " received myprotocol packet of size: " << packetSize
                                  << " and packet id: " << packet->GetUid ());
   uint32_t count = 0;
-  for (; packetSize > 0; packetSize = packetSize - 12)
+  // ADD: 循环减去的数量要和header长度相同
+  for (; packetSize > 0; packetSize = packetSize - 28)
     {
       count = 0;
       MyprotocolHeader myprotocolHeader, tempMyprotocolHeader;
@@ -603,11 +604,19 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
       NS_LOG_DEBUG ("Received a myprotocol packet from "
                     << sender << " to " << receiver << ". Details are: Destination: " << myprotocolHeader.GetDst () << ", Seq No: "
                     << myprotocolHeader.GetDstSeqno () << ", HopCount: " << myprotocolHeader.GetHopCount ());
+
+      // ADD:判断该控制包包头的速度符号
+      Vector velocity = GetRightVelocity(myprotocolHeader.GetVx(), myprotocolHeader.GetVy(), myprotocolHeader.GetVz(), myprotocolHeader.GetSign());
+      // ADD:测试和调试信息打印
+      // std::cout<<"x = "<<myprotocolHeader.GetX()<<",y = "<<myprotocolHeader.GetY()<<",z = "<<myprotocolHeader.GetZ()<<"\n";
+      // std::cout<<"vx = "<<myprotocolHeader.GetVx()<<",vy = "<<myprotocolHeader.GetVy()<<",vz = "<<myprotocolHeader.GetVz()<<",sign = "<<myprotocolHeader.GetSign()<<"\n";
+      // std::cout<<"right velocity = "<<velocity<<"\n";
       RoutingTableEntry fwdTableEntry, advTableEntry;
       EventId event;
       bool permanentTableVerifier = m_routingTable.LookupRoute (myprotocolHeader.GetDst (),fwdTableEntry);
       if (permanentTableVerifier == false)
         {
+          // ADD:更新路由表的位置、速度、时间戳信息
           if (myprotocolHeader.GetDstSeqno () % 2 != 1)
             {
               NS_LOG_DEBUG ("Received New Route!");
@@ -620,7 +629,14 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
                 sender, /*lifetime=*/
                 Simulator::Now (), /*settlingTime*/
                 m_settlingTime, /*entries changed*/
-                true);
+                true,
+                myprotocolHeader.GetX(),
+                myprotocolHeader.GetY(),
+                myprotocolHeader.GetZ(),
+                velocity.x,
+                velocity.y,
+                velocity.z,
+                myprotocolHeader.GetTimestamp());
               newEntry.SetFlag (VALID);
               m_routingTable.AddRoute (newEntry);
               NS_LOG_DEBUG ("New Route added to both tables");
@@ -671,6 +687,14 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
                       advTableEntry.SetSettlingTime (tempSettlingtime);
                       NS_LOG_DEBUG ("Added Settling Time:" << tempSettlingtime.GetSeconds ()
                                                            << "s as there is no event running for this route");
+                      // ADD:更新路由表
+                      advTableEntry.SetX(myprotocolHeader.GetX());
+                      advTableEntry.SetY(myprotocolHeader.GetY());
+                      advTableEntry.SetZ(myprotocolHeader.GetZ());
+                      advTableEntry.SetVx(velocity.x);
+                      advTableEntry.SetVy(velocity.y);
+                      advTableEntry.SetVz(velocity.z);
+                      advTableEntry.SetTimestamp(myprotocolHeader.GetTimestamp());
                       event = Simulator::Schedule (tempSettlingtime,&RoutingProtocol::SendTriggeredUpdate,this);
                       m_advRoutingTable.AddIpv4Event (myprotocolHeader.GetDst (),event);
                       NS_LOG_DEBUG ("EventCreated EventUID: " << event.GetUid ());
@@ -687,6 +711,14 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
                       advTableEntry.SetEntriesChanged (true);
                       advTableEntry.SetNextHop (sender);
                       advTableEntry.SetHop (myprotocolHeader.GetHopCount ());
+                      // ADD：更新路由表
+                      advTableEntry.SetX(myprotocolHeader.GetX());
+                      advTableEntry.SetY(myprotocolHeader.GetY());
+                      advTableEntry.SetZ(myprotocolHeader.GetZ());
+                      advTableEntry.SetVx(velocity.x);
+                      advTableEntry.SetVy(velocity.y);
+                      advTableEntry.SetVz(velocity.z);
+                      advTableEntry.SetTimestamp(myprotocolHeader.GetTimestamp());
                       m_advRoutingTable.Update (advTableEntry);
                       NS_LOG_DEBUG ("Route with better sequence number and same metric received. Advertised without WST");
                     }
@@ -711,6 +743,14 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
                       advTableEntry.SetSettlingTime (tempSettlingtime);
                       NS_LOG_DEBUG ("Added Settling Time," << tempSettlingtime.GetSeconds ()
                                                            << " as there is no current event running for this route");
+                      // ADD：更新路由表
+                      advTableEntry.SetX(myprotocolHeader.GetX());
+                      advTableEntry.SetY(myprotocolHeader.GetY());
+                      advTableEntry.SetZ(myprotocolHeader.GetZ());
+                      advTableEntry.SetVx(velocity.x);
+                      advTableEntry.SetVy(velocity.y);
+                      advTableEntry.SetVz(velocity.z);
+                      advTableEntry.SetTimestamp(myprotocolHeader.GetTimestamp());
                       event = Simulator::Schedule (tempSettlingtime,&RoutingProtocol::SendTriggeredUpdate,this);
                       m_advRoutingTable.AddIpv4Event (myprotocolHeader.GetDst (),event);
                       NS_LOG_DEBUG ("EventCreated EventUID: " << event.GetUid ());
@@ -798,11 +838,10 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
     }
 }
 
-
+// 更新m_advRoutingTable中的数据，只有在settlingtime之后才会广播
 void
 RoutingProtocol::SendTriggeredUpdate ()
 {
-  // std::cout<<"1111\n";
   NS_LOG_FUNCTION (m_mainAddress << " is sending a triggered update");
   std::map<Ipv4Address, RoutingTableEntry> allRoutes;
   m_advRoutingTable.GetListOfAllRoutes (allRoutes);
@@ -824,6 +863,17 @@ RoutingProtocol::SendTriggeredUpdate ()
               myprotocolHeader.SetDst (i->second.GetDestination ());
               myprotocolHeader.SetDstSeqno (i->second.GetSeqNo ());
               myprotocolHeader.SetHopCount (i->second.GetHop () + 1);
+              // ADD:将自己的路由表信息转换成header包头的信息。
+              myprotocolHeader.SetX(i->second.GetX());
+              myprotocolHeader.SetY(i->second.GetY());
+              myprotocolHeader.SetZ(i->second.GetZ());
+              myprotocolHeader.SetVx(abs(i->second.GetVx()));
+              myprotocolHeader.SetVy(abs(i->second.GetVy()));
+              myprotocolHeader.SetVz(abs(i->second.GetVz()));
+              uint16_t sign = SetRightVelocity(i->second.GetVx(),i->second.GetVy(),i->second.GetVz());
+              myprotocolHeader.SetSign(sign);
+              myprotocolHeader.SetTimestamp(i->second.GetTimestamp());
+
               temp.SetFlag (VALID);
               temp.SetEntriesChanged (false);
               m_advRoutingTable.DeleteIpv4Event (temp.GetDestination ());
@@ -843,13 +893,32 @@ RoutingProtocol::SendTriggeredUpdate ()
                                        << temp.GetDestination () << " has not expired, waiting in adv table");
             }
         }
-      if (packet->GetSize () >= 12)
+      // ADD：这里的数是header的长度，因为packet大于header长度的话表示在数据宝里添加了路由表的内容，则再加上节点本身的信息，即可广播更新。
+      if (packet->GetSize () >= 28)
         {
           RoutingTableEntry temp2;
           m_routingTable.LookupRoute (m_ipv4->GetAddress (1, 0).GetBroadcast (), temp2);
           myprotocolHeader.SetDst (m_ipv4->GetAddress (1, 0).GetLocal ());
           myprotocolHeader.SetDstSeqno (temp2.GetSeqNo ());
           myprotocolHeader.SetHopCount (temp2.GetHop () + 1);
+
+          // ADD:将自己的位置信息加入到header中,这里有一个强制转换
+          Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
+          Vector myPos = MM->GetPosition();
+          myprotocolHeader.SetX((uint16_t)myPos.x);
+          myprotocolHeader.SetY((uint16_t)myPos.y);
+          myprotocolHeader.SetZ((uint16_t)myPos.z);
+          Vector myVel = MM->GetVelocity();
+          int16_t vx = (int16_t)myVel.x;
+          int16_t vy = (int16_t)myVel.y;
+          int16_t vz = (int16_t)myVel.z;
+          uint16_t sign = SetRightVelocity(vx,vy,vz);
+          myprotocolHeader.SetVx(abs(vx));
+          myprotocolHeader.SetVy(abs(vy));
+          myprotocolHeader.SetVz(abs(vz));
+          myprotocolHeader.SetSign(sign);
+          myprotocolHeader.SetTimestamp(Simulator::Now ().ToInteger(Time::S));
+
           NS_LOG_DEBUG ("Adding my update as well to the packet");
           packet->AddHeader (myprotocolHeader);
           // Send to all-hosts broadcast if on /32 addr, subnet-directed otherwise
@@ -877,7 +946,6 @@ RoutingProtocol::SendTriggeredUpdate ()
 void
 RoutingProtocol::SendPeriodicUpdate ()
 {
-  // std::cout<<"2222\n";
   std::map<Ipv4Address, RoutingTableEntry> removedAddresses, allRoutes;
   m_routingTable.Purge (removedAddresses);
   MergeTriggerPeriodicUpdates ();
@@ -896,12 +964,31 @@ RoutingProtocol::SendPeriodicUpdate ()
       for (std::map<Ipv4Address, RoutingTableEntry>::const_iterator i = allRoutes.begin (); i != allRoutes.end (); ++i)
         {
           MyprotocolHeader myprotocolHeader;
+          // 发送自己的信息
           if (i->second.GetHop () == 0)
             {
               RoutingTableEntry ownEntry;
               myprotocolHeader.SetDst (m_ipv4->GetAddress (1,0).GetLocal ());
               myprotocolHeader.SetDstSeqno (i->second.GetSeqNo () + 2);
               myprotocolHeader.SetHopCount (i->second.GetHop () + 1);
+              
+              // ADD:将自己的位置信息加入到header中,这里有一个强制转换
+              Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
+              Vector myPos = MM->GetPosition();
+              myprotocolHeader.SetX((uint16_t)myPos.x);
+              myprotocolHeader.SetY((uint16_t)myPos.y);
+              myprotocolHeader.SetZ((uint16_t)myPos.z);
+              Vector myVel = MM->GetVelocity();
+              int16_t vx = (int16_t)myVel.x;
+              int16_t vy = (int16_t)myVel.y;
+              int16_t vz = (int16_t)myVel.z;
+              uint16_t sign = SetRightVelocity(vx,vy,vz);
+              myprotocolHeader.SetVx(abs(vx));
+              myprotocolHeader.SetVy(abs(vy));
+              myprotocolHeader.SetVz(abs(vz));
+              myprotocolHeader.SetSign(sign);
+              myprotocolHeader.SetTimestamp(Simulator::Now ().ToInteger(Time::S));
+
               m_routingTable.LookupRoute (m_ipv4->GetAddress (1,0).GetBroadcast (),ownEntry);
               ownEntry.SetSeqNo (myprotocolHeader.GetDstSeqno ());
               m_routingTable.Update (ownEntry);
@@ -912,6 +999,18 @@ RoutingProtocol::SendPeriodicUpdate ()
               myprotocolHeader.SetDst (i->second.GetDestination ());
               myprotocolHeader.SetDstSeqno ((i->second.GetSeqNo ()));
               myprotocolHeader.SetHopCount (i->second.GetHop () + 1);
+
+              // ADD:将自己的路由表信息转换成header包头的信息。
+              myprotocolHeader.SetX(i->second.GetX());
+              myprotocolHeader.SetY(i->second.GetY());
+              myprotocolHeader.SetZ(i->second.GetZ());
+              myprotocolHeader.SetVx(abs(i->second.GetVx()));
+              myprotocolHeader.SetVy(abs(i->second.GetVy()));
+              myprotocolHeader.SetVz(abs(i->second.GetVz()));
+              uint16_t sign = SetRightVelocity(i->second.GetVx(),i->second.GetVy(),i->second.GetVz());
+              myprotocolHeader.SetSign(sign);
+              myprotocolHeader.SetTimestamp(i->second.GetTimestamp());
+
               packet->AddHeader (myprotocolHeader);
             }
           NS_LOG_DEBUG ("Forwarding the update for " << i->first);

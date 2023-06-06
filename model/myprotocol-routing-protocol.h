@@ -42,6 +42,8 @@
 #include "ns3/ipv4-interface.h"
 #include "ns3/ipv4-l3-protocol.h"
 #include "ns3/output-stream-wrapper.h"
+// 添加移动模型
+#include "ns3/mobility-model.h"
 
 namespace ns3 {
 namespace myprotocol {
@@ -248,6 +250,68 @@ private:
   /// Notify that packet is dropped for some reason
   void
   Drop (Ptr<const Packet>, const Ipv4Header &, Socket::SocketErrno);
+
+
+  // ADD:转换速度符号的两个函数。sign：记录速度是否为负数，0:都不是负数，1:X轴速度为负，2:Y轴速度为负，3:Z轴速度为负,4：xy为负数，5：xz为负数，6：yz为负数，7：全部都是负数
+  Vector GetRightVelocity(uint16_t vx, uint16_t vy, uint16_t vz, uint16_t sign){
+    if(sign == 0){
+      return Vector(vx,vy,vz);
+    }
+    if(sign == 1){
+      return Vector(-vx,vy,vz);
+    }
+    if(sign == 2){
+      return Vector(vx,-vy,vz);
+    }
+    if(sign == 3){
+      return Vector(vx,vy,-vz);
+    }
+    if(sign == 4){
+      return Vector(-vx,-vy,vz);
+    }
+    if(sign == 5){
+      return Vector(-vx,vy,-vz);
+    }
+    if(sign == 6){
+      return Vector(vx,-vy,-vz);
+    }
+    if(sign == 7){
+      return Vector(-vx,-vy,-vz);
+    }
+    std::cout<<"sign is wrong!!!\n";
+    return Vector(999,999,999);
+  }
+
+  uint16_t SetRightVelocity(int16_t vx, int16_t vy, int16_t vz){
+    uint16_t sign = 9;
+    if(vx >= 0 && vy >= 0 && vz >= 0){
+      sign = 0;
+    }
+    if(vx < 0 && vy >= 0 && vz >= 0){
+      sign = 1;
+    }
+    if(vx >= 0 && vy < 0 && vz >= 0){
+      sign = 2;
+    }
+    if(vx >= 0 && vy >= 0 && vz < 0){
+      sign = 3;
+    }
+    if(vx < 0 && vy < 0 && vz >= 0){
+      sign = 4;
+    }
+    if(vx < 0 && vy >= 0 && vz < 0){
+      sign = 5;
+    }
+    if(vx >= 0 && vy < 0 && vz < 0){
+      sign = 6;
+    }
+    if(vx < 0 && vy < 0 && vz < 0){
+      sign = 7;
+    }
+    // std::cout<<"!!!!sign = "<<sign<<"\n";
+    return sign;
+  }
+
   /// Timer to trigger periodic updates from a node
   Timer m_periodicUpdateTimer;
   /// Timer used by the trigger updates in case of Weighted Settling Time is used

@@ -37,6 +37,7 @@ namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("MyprotocolRoutingTable");
 
+// ADD:修改构造函数中的参数
 namespace myprotocol {
 RoutingTableEntry::RoutingTableEntry (Ptr<NetDevice> dev,
                                       Ipv4Address dst,
@@ -46,14 +47,28 @@ RoutingTableEntry::RoutingTableEntry (Ptr<NetDevice> dev,
                                       Ipv4Address nextHop,
                                       Time lifetime,
                                       Time SettlingTime,
-                                      bool areChanged)
+                                      bool areChanged,
+                                      uint16_t x,
+                                      uint16_t y,
+                                      uint16_t z,
+                                      int16_t vx,
+                                      int16_t vy,
+                                      int16_t vz,
+                                      uint16_t timestamp)
   : m_seqNo (seqNo),
     m_hops (hops),
     m_lifeTime (lifetime),
     m_iface (iface),
     m_flag (VALID),
     m_settlingTime (SettlingTime),
-    m_entriesChanged (areChanged)
+    m_entriesChanged (areChanged),
+    m_x(x),
+    m_y(y),
+    m_z(z),
+    m_vx(vx),
+    m_vy(vy),
+    m_vz(vz),
+    m_timestamp(timestamp)
 {
   m_ipv4Route = Create<Ipv4Route> ();
   m_ipv4Route->SetDestination (dst);
@@ -201,7 +216,8 @@ RoutingTableEntry::Print (Ptr<OutputStreamWrapper> stream) const
                         << m_iface.GetLocal () << "\t\t" << std::setiosflags (std::ios::left)
                         << std::setw (10) << m_hops << "\t" << std::setw (10) << m_seqNo << "\t"
                         << std::setprecision (3) << (Simulator::Now () - m_lifeTime).GetSeconds ()
-                        << "s\t\t" << m_settlingTime.GetSeconds () << "s\n";
+                        << "s\t\t" << m_settlingTime.GetSeconds () << "s\t\t" << m_x << "\t\t" << m_y << "\t\t" << m_z << "\t\t"
+                        << m_vx << "\t\t" << m_vy << "\t\t" << m_vz << "\t\t" << m_timestamp << "\n";
 }
 
 void
@@ -251,7 +267,7 @@ RoutingTable::Purge (std::map<Ipv4Address, RoutingTableEntry> & removedAddresses
 void
 RoutingTable::Print (Ptr<OutputStreamWrapper> stream) const
 {
-  *stream->GetStream () << "\n myprotocol Routing table\n" << "Destination\t\tGateway\t\tInterface\t\tHopCount\t\tSeqNum\t\tLifeTime\t\tSettlingTime\n";
+  *stream->GetStream () << "\n myprotocol Routing table\n" << "Destination\t\tGateway\t\tInterface\t\tHopCount\t\tSeqNum\t\tLifeTime\t\tSettlingTime\t\tx\t\ty\t\tz\t\tvx\t\tvy\t\tvz\t\ttimestamp\n";
   for (std::map<Ipv4Address, RoutingTableEntry>::const_iterator i = m_ipv4AddressEntry.begin (); i
        != m_ipv4AddressEntry.end (); ++i)
     {
