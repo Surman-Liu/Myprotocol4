@@ -308,7 +308,6 @@ private:
     if(vx < 0 && vy < 0 && vz < 0){
       sign = 7;
     }
-    // std::cout<<"!!!!sign = "<<sign<<"\n";
     return sign;
   }
 

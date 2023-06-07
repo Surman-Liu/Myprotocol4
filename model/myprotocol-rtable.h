@@ -73,7 +73,8 @@ public:
   RoutingTableEntry (Ptr<NetDevice> dev = 0, Ipv4Address dst = Ipv4Address (), uint32_t seqNo = 0,
                      Ipv4InterfaceAddress iface = Ipv4InterfaceAddress (), uint32_t hops = 0, Ipv4Address nextHop = Ipv4Address (),
                      Time lifetime = Simulator::Now (), Time SettlingTime = Simulator::Now (), bool changedEntries = false,
-                     uint16_t x = 0,uint16_t y = 0,uint16_t z = 0, int16_t vx = 0,int16_t vy = 0,int16_t vz = 0, uint16_t timestamp = 0);
+                     uint16_t x = 0,uint16_t y = 0,uint16_t z = 0, int16_t vx = 0,int16_t vy = 0,int16_t vz = 0,
+                    uint16_t timestamp = 0, Ipv4Address adress = Ipv4Address ());
 
   ~RoutingTableEntry ();
   /**
@@ -325,6 +326,14 @@ public:
   uint16_t GetTimestamp() const{
     return m_timestamp;
   }
+  void SetAdress (Ipv4Address adress)
+  {
+    m_adress = adress;
+  }
+  Ipv4Address GetAdress () const
+  {
+    return m_adress;
+  }
 
 private:
   // Fields
@@ -364,6 +373,7 @@ private:
   int16_t m_vy;
   int16_t m_vz;
   uint16_t m_timestamp;
+  Ipv4Address m_adress;
 };
 
 /**

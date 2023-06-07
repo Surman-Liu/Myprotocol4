@@ -54,7 +54,8 @@ RoutingTableEntry::RoutingTableEntry (Ptr<NetDevice> dev,
                                       int16_t vx,
                                       int16_t vy,
                                       int16_t vz,
-                                      uint16_t timestamp)
+                                      uint16_t timestamp,
+                                      Ipv4Address adress)
   : m_seqNo (seqNo),
     m_hops (hops),
     m_lifeTime (lifetime),
@@ -68,7 +69,8 @@ RoutingTableEntry::RoutingTableEntry (Ptr<NetDevice> dev,
     m_vx(vx),
     m_vy(vy),
     m_vz(vz),
-    m_timestamp(timestamp)
+    m_timestamp(timestamp),
+    m_adress(adress)
 {
   m_ipv4Route = Create<Ipv4Route> ();
   m_ipv4Route->SetDestination (dst);
@@ -217,7 +219,7 @@ RoutingTableEntry::Print (Ptr<OutputStreamWrapper> stream) const
                         << std::setw (10) << m_hops << "\t" << std::setw (10) << m_seqNo << "\t"
                         << std::setprecision (3) << (Simulator::Now () - m_lifeTime).GetSeconds ()
                         << "s\t\t" << m_settlingTime.GetSeconds () << "s\t\t" << m_x << "\t\t" << m_y << "\t\t" << m_z << "\t\t"
-                        << m_vx << "\t\t" << m_vy << "\t\t" << m_vz << "\t\t" << m_timestamp << "\n";
+                        << m_vx << "\t\t" << m_vy << "\t\t" << m_vz << "\t\t" << m_timestamp << "\t\t" << m_adress << "\n";
 }
 
 void
@@ -267,7 +269,7 @@ RoutingTable::Purge (std::map<Ipv4Address, RoutingTableEntry> & removedAddresses
 void
 RoutingTable::Print (Ptr<OutputStreamWrapper> stream) const
 {
-  *stream->GetStream () << "\n myprotocol Routing table\n" << "Destination\t\tGateway\t\tInterface\t\tHopCount\t\tSeqNum\t\tLifeTime\t\tSettlingTime\t\tx\t\ty\t\tz\t\tvx\t\tvy\t\tvz\t\ttimestamp\n";
+  *stream->GetStream () << "\n myprotocol Routing table\n" << "Destination\t\tGateway\t\tInterface\t\tHopCount\t\tSeqNum\t\tLifeTime\t\tSettlingTime\t\tx\t\ty\t\tz\t\tvx\t\tvy\t\tvz\t\ttimestamp\t\tadress\n";
   for (std::map<Ipv4Address, RoutingTableEntry>::const_iterator i = m_ipv4AddressEntry.begin (); i
        != m_ipv4AddressEntry.end (); ++i)
     {
