@@ -40,6 +40,10 @@
 #include "ns3/timer.h"
 #include "ns3/net-device.h"
 #include "ns3/output-stream-wrapper.h"
+// ADD：添加Vector
+#include "ns3/vector.h"
+// 添加移动模型
+#include "ns3/mobility-model.h"
 
 namespace ns3 {
 namespace myprotocol {
@@ -522,6 +526,21 @@ public:
   {
     m_holddownTime = t;
   }
+
+  // ADD: 位置预测函数
+  Vector PredictPosition(Ipv4Address id);
+
+  // ADD：筛选邻居节点
+  void LookupNeighbor(std::map<Ipv4Address, RoutingTableEntry> & neighborTable, Vector myPos);
+
+  // ADD:贪婪寻找最优下一跳的函数
+  /**
+   * \brief Gets next hop according to GPSR protocol
+   * \param position the position of the destination node
+   * \param nodePos the position of the node that has the packet
+   * \return Ipv4Address of the next hop, Ipv4Address::GetZero () if no nighbour was found in greedy mode
+   */
+  Ipv4Address BestNeighbor (Ipv4Address dst, Vector myPos);
 
 private:
   // Fields

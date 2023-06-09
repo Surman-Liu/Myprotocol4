@@ -140,5 +140,106 @@ MyprotocolHeader::Print (std::ostream &os) const
      << " timestamp: "<<m_timestamp
      << " myadress: "<<m_myadress;
 }
+
+//-----------------------------------------------------------------------------
+// Data
+//-----------------------------------------------------------------------------
+NS_OBJECT_ENSURE_REGISTERED (DataHeader);
+
+DataHeader::DataHeader (uint16_t dstPosx, uint16_t dstPosy, uint16_t updated, uint16_t recPosx, uint16_t recPosy, 
+                  uint16_t inRec , uint16_t lastPosx, uint16_t lastPosy)
+  : m_dstPosx (dstPosx),
+    m_dstPosy (dstPosy),
+    m_updated (updated),
+    m_recPosx (recPosx),
+    m_recPosy (recPosy),
+    m_inRec (inRec),
+    m_lastPosx (lastPosx),
+    m_lastPosy (lastPosy)
+{
+}
+
+TypeId
+DataHeader::GetTypeId ()
+{
+  static TypeId tid = TypeId ("ns3::gpsr::DataHeader")
+    .SetParent<Header> ()
+    .AddConstructor<DataHeader> ()
+  ;
+  return tid;
+}
+
+TypeId
+DataHeader::GetInstanceTypeId () const
+{
+  return GetTypeId ();
+}
+
+// 数据头大小2*8 = 16
+uint32_t
+DataHeader::GetSerializedSize () const
+{
+  return 16;
+}
+
+void
+DataHeader::Serialize (Buffer::Iterator i) const
+{
+  i.WriteU16 (m_dstPosx);
+  i.WriteU16 (m_dstPosy);
+  i.WriteU16 (m_updated);
+  i.WriteU16 (m_recPosx);
+  i.WriteU16 (m_recPosy);
+  i.WriteU16 (m_inRec);
+  i.WriteU16 (m_lastPosx);
+  i.WriteU16 (m_lastPosy);
+}
+
+uint32_t
+DataHeader::Deserialize (Buffer::Iterator start)
+{
+  Buffer::Iterator i = start;
+  m_dstPosx = i.ReadU16 ();
+  m_dstPosy = i.ReadU16 ();
+  m_updated = i.ReadU16 ();
+  m_recPosx = i.ReadU16 ();
+  m_recPosy = i.ReadU16 ();
+  m_inRec = i.ReadU16 ();
+  m_lastPosx = i.ReadU16 ();
+  m_lastPosy = i.ReadU16 ();
+
+  uint32_t dist = i.GetDistanceFrom (start);
+  NS_ASSERT (dist == GetSerializedSize ());
+  return dist;
+}
+
+void
+DataHeader::Print (std::ostream &os) const
+{
+  os << " PositionX: "  << m_dstPosx
+     << " PositionY: " << m_dstPosy
+     << " Updated: " << m_updated
+     << " RecPositionX: " << m_recPosx
+     << " RecPositionY: " << m_recPosy
+     << " inRec: " << m_inRec
+     << " LastPositionX: " << m_lastPosx
+     << " LastPositionY: " << m_lastPosy;
+}
+
+std::ostream &
+operator<< (std::ostream & os, DataHeader const & h)
+{
+  h.Print (os);
+  return os;
+}
+
+
+
+bool
+DataHeader::operator== (DataHeader const & o) const
+{
+  return (m_dstPosx == o.m_dstPosx && m_dstPosy == o.m_dstPosy && m_updated == o.m_updated && m_recPosx == o.m_recPosx && m_recPosy == o.m_recPosy && m_inRec == o.m_inRec && m_lastPosx == o.m_lastPosx && m_lastPosy == o.m_lastPosy);
+}
+
 }
 }

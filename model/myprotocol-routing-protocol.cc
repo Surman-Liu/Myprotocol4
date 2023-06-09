@@ -289,6 +289,7 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p,
   Ipv4Address dst = header.GetDestination ();
   NS_LOG_DEBUG ("Packet Size: " << p->GetSize ()
                                 << ", Packet id: " << p->GetUid () << ", Destination address in Packet: " << dst);
+  
   RoutingTableEntry rt;
   m_routingTable.Purge (removedAddresses);
   for (std::map<Ipv4Address, RoutingTableEntry>::iterator rmItr = removedAddresses.begin ();

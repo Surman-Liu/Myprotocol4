@@ -279,7 +279,7 @@ private:
       return Vector(-vx,-vy,-vz);
     }
     std::cout<<"sign is wrong!!!\n";
-    return Vector(999,999,999);
+    return Vector(0,0,0);
   }
 
   uint16_t SetRightVelocity(int16_t vx, int16_t vy, int16_t vz){

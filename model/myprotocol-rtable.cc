@@ -365,5 +365,76 @@ RoutingTable::GetEventId (Ipv4Address address)
       return i->second;
     }
 }
+
+// ADD:位置预测函数
+Vector 
+RoutingTable::PredictPosition(Ipv4Address id){
+  RoutingTableEntry rt;
+  if(!LookupRoute(id,rt)){
+    std::cout<<"not find a valid routing entry!!!\n";
+    return Vector(0,0,0);
+  }else{
+    // 先获取该节点的速度、位置、时间戳
+    uint16_t deltaTime = rt.GetTimestamp() - Simulator::Now ().ToInteger(Time::S);
+    uint16_t newX = rt.GetX() + deltaTime * rt.GetVx();
+    uint16_t newY = rt.GetY() + deltaTime * rt.GetVy();
+    uint16_t newZ = rt.GetZ() + deltaTime * rt.GetVz();
+    return Vector(newX, newY, newZ);
+  }
+}
+
+// ADD：筛选邻居节点
+void 
+RoutingTable::LookupNeighbor(std::map<Ipv4Address, RoutingTableEntry> & neighborTable, Vector myPos){
+  // 传输范围250m
+  uint16_t TransmissionRange = 250;
+  for (std::map<Ipv4Address, RoutingTableEntry>::iterator i = m_ipv4AddressEntry.begin (); i != m_ipv4AddressEntry.end (); i++){
+    Vector predictPos = PredictPosition(i->first);
+    double distance = CalculateDistance(predictPos, myPos);
+    // 距离小于传输范围，可以认为是邻居
+    if(distance <= TransmissionRange){
+      neighborTable.insert(std::make_pair(i->first,i->second));
+    }
+  }
+}
+
+// ADD：实现贪婪寻找最优下一条路径
+/**
+ * \brief Gets next hop according to GPSR protocol
+ * \param position the position of the destination node
+ * \param nodePos the position of the node that has the packet
+ * \return Ipv4Address of the next hop, Ipv4Address::GetZero () if no nighbour was found in greedy mode
+ */
+Ipv4Address 
+RoutingTable::BestNeighbor (Ipv4Address dst, Vector myPos)
+{
+  std::map<Ipv4Address, RoutingTableEntry> neighborTable;
+  LookupNeighbor(neighborTable, myPos);
+  Vector predictDstPos = PredictPosition(dst);
+
+  double initialDistance = CalculateDistance (predictDstPos, myPos);
+
+  if (neighborTable.empty ())
+    {
+      std::cout<<"BestNeighbor table is empty!!!\n";
+      NS_LOG_DEBUG ("BestNeighbor table is empty");
+      return Ipv4Address::GetZero ();
+    }     //if table is empty (no neighbours)
+
+  Ipv4Address bestFoundID = neighborTable.begin ()->first;
+  double bestFoundDistance = CalculateDistance (PredictPosition(neighborTable.begin ()->first), predictDstPos);
+
+  for (std::map<Ipv4Address, RoutingTableEntry>::iterator i = neighborTable.begin (); i != neighborTable.end (); i++){
+    if(bestFoundDistance > CalculateDistance (PredictPosition(i->first), predictDstPos)){
+      bestFoundID = i->first;
+      bestFoundDistance = CalculateDistance (PredictPosition(i->first), predictDstPos);
+    }
+  }  
+  if(initialDistance > bestFoundDistance){
+    return bestFoundID;
+  }else{
+    return Ipv4Address::GetZero (); //so it enters Recovery-mode
+  }
+}
 }
 }

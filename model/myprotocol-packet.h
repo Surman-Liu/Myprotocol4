@@ -210,11 +210,108 @@ private:
   uint16_t m_timestamp;
   Ipv4Address m_myadress;
 };
+
 static inline std::ostream & operator<< (std::ostream& os, const MyprotocolHeader & packet)
 {
   packet.Print (os);
   return os;
 }
+
+class DataHeader : public Header
+{
+public:
+  /// c-tor
+  DataHeader (uint16_t dstPosx = 0, uint16_t dstPosy = 0, uint16_t updated = 0, uint16_t recPosx = 0, uint16_t recPosy = 0, 
+                  uint16_t inRec  = 0, uint16_t lastPosx = 0, uint16_t lastPosy = 0);
+
+  ///\name Header serialization/deserialization
+  static TypeId GetTypeId ();
+  TypeId GetInstanceTypeId () const;
+  uint32_t GetSerializedSize () const;
+  void Serialize (Buffer::Iterator start) const;
+  uint32_t Deserialize (Buffer::Iterator start);
+  void Print (std::ostream &os) const;
+
+  /// get/set function
+  void SetDstPosx (uint16_t posx)
+  {
+    m_dstPosx = posx;
+  }
+  uint16_t GetDstPosx () const
+  {
+    return m_dstPosx;
+  }
+  void SetDstPosy (uint16_t posy)
+  {
+    m_dstPosy = posy;
+  }
+  uint16_t GetDstPosy () const
+  {
+    return m_dstPosy;
+  }
+  void SetUpdated (uint16_t updated)
+  {
+    m_updated = updated;
+  }
+  uint16_t GetUpdated () const
+  {
+    return m_updated;
+  }
+  void SetRecPosx (uint16_t posx)
+  {
+    m_recPosx = posx;
+  }
+  uint16_t GetRecPosx () const
+  {
+    return m_recPosx;
+  }
+  void SetRecPosy (uint16_t posy)
+  {
+    m_recPosy = posy;
+  }
+  uint16_t GetRecPosy () const
+  {
+    return m_recPosy;
+  }
+  void SetInRec (uint16_t rec)
+  {
+    m_inRec = rec;
+  }
+  uint16_t GetInRec () const
+  {
+    return m_inRec;
+  }
+  void SetLastPosx (uint16_t posx)
+  {
+    m_lastPosx = posx;
+  }
+  uint16_t GetLastPosx () const
+  {
+    return m_lastPosx;
+  }
+  void SetLastPosy (uint16_t posy)
+  {
+    m_lastPosy = posy;
+  }
+  uint16_t GetLastPosy () const
+  {
+    return m_lastPosy;
+  }
+
+  bool operator== (DataHeader const & o) const;
+
+private:
+  uint16_t         m_dstPosx;          ///< Destination Position x
+  uint16_t         m_dstPosy;          ///< Destination Position x
+  uint16_t         m_updated;          ///< Time of last update
+  uint16_t         m_recPosx;          ///< x of position that entered Recovery-mode
+  uint16_t         m_recPosy;          ///< y of position that entered Recovery-mode
+  uint16_t         m_inRec;             ///< 1 if in Recovery-mode, 0 otherwise
+  uint16_t         m_lastPosx;          ///< x of position of previous hop
+  uint16_t         m_lastPosy;          ///< y of position of previous hop
+};
+
+std::ostream & operator<< (std::ostream & os, DataHeader const & h);
 }
 }
 
