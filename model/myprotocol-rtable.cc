@@ -372,7 +372,7 @@ RoutingTable::PredictPosition(Ipv4Address id){
   RoutingTableEntry rt;
   if(!LookupRoute(id,rt)){
     std::cout<<"not find a valid routing entry!!!\n";
-    return Vector(0,0,0);
+    return Vector(-1,-1,-1);
   }else{
     // 先获取该节点的速度、位置、时间戳
     uint16_t deltaTime = rt.GetTimestamp() - Simulator::Now ().ToInteger(Time::S);
@@ -390,6 +390,9 @@ RoutingTable::LookupNeighbor(std::map<Ipv4Address, RoutingTableEntry> & neighbor
   uint16_t TransmissionRange = 250;
   for (std::map<Ipv4Address, RoutingTableEntry>::iterator i = m_ipv4AddressEntry.begin (); i != m_ipv4AddressEntry.end (); i++){
     Vector predictPos = PredictPosition(i->first);
+    if(CalculateDistance (predictPos, Vector(-1,-1,-1)) == 0){
+      continue;
+    }
     double distance = CalculateDistance(predictPos, myPos);
     // 距离小于传输范围，可以认为是邻居
     if(distance <= TransmissionRange){
@@ -411,6 +414,9 @@ RoutingTable::BestNeighbor (Ipv4Address dst, Vector myPos)
   std::map<Ipv4Address, RoutingTableEntry> neighborTable;
   LookupNeighbor(neighborTable, myPos);
   Vector predictDstPos = PredictPosition(dst);
+  if(CalculateDistance (predictDstPos, Vector(-1,-1,-1)) == 0){
+    return Ipv4Address::GetZero ();
+  }
 
   double initialDistance = CalculateDistance (predictDstPos, myPos);
 
@@ -420,7 +426,6 @@ RoutingTable::BestNeighbor (Ipv4Address dst, Vector myPos)
       NS_LOG_DEBUG ("BestNeighbor table is empty");
       return Ipv4Address::GetZero ();
     }     //if table is empty (no neighbours)
-
   Ipv4Address bestFoundID = neighborTable.begin ()->first;
   double bestFoundDistance = CalculateDistance (PredictPosition(neighborTable.begin ()->first), predictDstPos);
 
@@ -436,5 +441,20 @@ RoutingTable::BestNeighbor (Ipv4Address dst, Vector myPos)
     return Ipv4Address::GetZero (); //so it enters Recovery-mode
   }
 }
+
+// ADD：检查是否符合恢复模式的条件（有目的地地址&有邻居&没有可以使用贪婪的下一跳）
+bool 
+RoutingTable::MatchRecovery(Ipv4Address dst, Vector myPos){
+  if(CalculateDistance (PredictPosition(dst), Vector(-1,-1,-1)) == 0){
+    return false;
+  }
+  std::map<Ipv4Address, RoutingTableEntry> neighborTable;
+  LookupNeighbor(neighborTable, myPos);
+  if (neighborTable.empty ()){
+    return false;
+  }
+  return true;
+}
+
 }
 }

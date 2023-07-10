@@ -542,6 +542,9 @@ public:
    */
   Ipv4Address BestNeighbor (Ipv4Address dst, Vector myPos);
 
+  // ADD: 检查是否符合恢复模式的条件（有目的地地址&有邻居&没有可以使用贪婪的下一跳）
+  bool MatchRecovery(Ipv4Address dst, Vector myPos);
+
 private:
   // Fields
   /// an entry in the routing table.

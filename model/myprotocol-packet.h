@@ -221,8 +221,8 @@ class DataHeader : public Header
 {
 public:
   /// c-tor
-  DataHeader (uint16_t dstPosx = 0, uint16_t dstPosy = 0, uint16_t updated = 0, uint16_t recPosx = 0, uint16_t recPosy = 0, 
-                  uint16_t inRec  = 0, uint16_t lastPosx = 0, uint16_t lastPosy = 0);
+  DataHeader (uint16_t dstPosx = 0, uint16_t dstPosy = 0,uint16_t dstPosz = 0, uint16_t updated = 0, uint16_t recPosx = 0, uint16_t recPosy = 0, uint16_t recPosz = 0, 
+                  uint16_t inRec  = 0, uint16_t lastPosx = 0, uint16_t lastPosy = 0, uint16_t lastPosz = 0);
 
   ///\name Header serialization/deserialization
   static TypeId GetTypeId ();
@@ -249,6 +249,14 @@ public:
   {
     return m_dstPosy;
   }
+  void SetDstPosz (uint16_t posz)
+  {
+    m_dstPosz = posz;
+  }
+  uint16_t GetDstPosz () const
+  {
+    return m_dstPosz;
+  }
   void SetUpdated (uint16_t updated)
   {
     m_updated = updated;
@@ -272,6 +280,14 @@ public:
   uint16_t GetRecPosy () const
   {
     return m_recPosy;
+  }
+  void SetRecPosz (uint16_t posz)
+  {
+    m_recPosz = posz;
+  }
+  uint16_t GetRecPosz () const
+  {
+    return m_recPosz;
   }
   void SetInRec (uint16_t rec)
   {
@@ -297,18 +313,29 @@ public:
   {
     return m_lastPosy;
   }
+  void SetLastPosz (uint16_t posz)
+  {
+    m_lastPosz = posz;
+  }
+  uint16_t GetLastPosz () const
+  {
+    return m_lastPosz;
+  }
 
   bool operator== (DataHeader const & o) const;
 
 private:
   uint16_t         m_dstPosx;          ///< Destination Position x
   uint16_t         m_dstPosy;          ///< Destination Position x
-  uint16_t         m_updated;          ///< Time of last update
+  uint16_t         m_dstPosz;
+  uint16_t         m_updated;          ///< 发出包的时间（记录这个包里面更新自己位置的事假）
   uint16_t         m_recPosx;          ///< x of position that entered Recovery-mode
   uint16_t         m_recPosy;          ///< y of position that entered Recovery-mode
+  uint16_t         m_recPosz; 
   uint16_t         m_inRec;             ///< 1 if in Recovery-mode, 0 otherwise
   uint16_t         m_lastPosx;          ///< x of position of previous hop
   uint16_t         m_lastPosy;          ///< y of position of previous hop
+  uint16_t         m_lastPosz; 
 };
 
 std::ostream & operator<< (std::ostream & os, DataHeader const & h);

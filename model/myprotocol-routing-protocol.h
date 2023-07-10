@@ -195,15 +195,15 @@ private:
   void
   DeferredRouteOutput (Ptr<const Packet> p, const Ipv4Header & header, UnicastForwardCallback ucb, ErrorCallback ecb);
   /// Look for any queued packets to send them out
-  void
-  LookForQueuedPackets (void);
+  // void
+  // LookForQueuedPackets (void);
   /**
    * Send packet from queue
    * \param dst - destination address to which we are sending the packet to
    * \param route - route identified for this packet
    */
-  void
-  SendPacketFromQueue (Ipv4Address dst, Ptr<Ipv4Route> route);
+  // void
+  // SendPacketFromQueue (Ipv4Address dst, Ptr<Ipv4Route> route);
   /**
    * Find socket with local interface address iface
    * \param iface the interface
@@ -236,17 +236,17 @@ private:
    * \param dst - destination address
    * \return settlingTime for the destination if found
    */
-  Time
-  GetSettlingTime (Ipv4Address dst);
+  // Time
+  // GetSettlingTime (Ipv4Address dst);
   /// Sends trigger update from a node
-  void
-  SendTriggeredUpdate ();
+  // void
+  // SendTriggeredUpdate ();
   /// Broadcasts the entire routing table for every PeriodicUpdateInterval
   void
   SendPeriodicUpdate ();
   /// Merge periodic updates
-  void
-  MergeTriggerPeriodicUpdates ();
+  // void
+  // MergeTriggerPeriodicUpdates ();
   /// Notify that packet is dropped for some reason
   void
   Drop (Ptr<const Packet>, const Ipv4Header &, Socket::SocketErrno);
@@ -310,6 +310,9 @@ private:
     }
     return sign;
   }
+
+  /// ADD： If route exists and valid, forward packet.
+  bool Forwarding (Ptr<const Packet> p, const Ipv4Header & header, UnicastForwardCallback ucb, ErrorCallback ecb);
 
   /// Timer to trigger periodic updates from a node
   Timer m_periodicUpdateTimer;
