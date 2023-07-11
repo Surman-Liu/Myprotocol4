@@ -39,16 +39,7 @@ NS_LOG_COMPONENT_DEFINE ("MyprotocolRoutingTable");
 
 // ADD:修改构造函数中的参数
 namespace myprotocol {
-RoutingTableEntry::RoutingTableEntry (Ptr<NetDevice> dev,
-                                      Ipv4Address dst,
-                                      uint32_t seqNo,
-                                      Ipv4InterfaceAddress iface,
-                                      uint32_t hops,
-                                      Ipv4Address nextHop,
-                                      Time lifetime,
-                                      Time SettlingTime,
-                                      bool areChanged,
-                                      uint16_t x,
+RoutingTableEntry::RoutingTableEntry (uint16_t x,
                                       uint16_t y,
                                       uint16_t z,
                                       int16_t vx,
@@ -56,14 +47,7 @@ RoutingTableEntry::RoutingTableEntry (Ptr<NetDevice> dev,
                                       int16_t vz,
                                       uint16_t timestamp,
                                       Ipv4Address adress)
-  : m_seqNo (seqNo),
-    m_hops (hops),
-    m_lifeTime (lifetime),
-    m_iface (iface),
-    m_flag (VALID),
-    m_settlingTime (SettlingTime),
-    m_entriesChanged (areChanged),
-    m_x(x),
+  : m_x(x),
     m_y(y),
     m_z(z),
     m_vx(vx),
@@ -72,15 +56,12 @@ RoutingTableEntry::RoutingTableEntry (Ptr<NetDevice> dev,
     m_timestamp(timestamp),
     m_adress(adress)
 {
-  m_ipv4Route = Create<Ipv4Route> ();
-  m_ipv4Route->SetDestination (dst);
-  m_ipv4Route->SetGateway (nextHop);
-  m_ipv4Route->SetSource (m_iface.GetLocal ());
-  m_ipv4Route->SetOutputDevice (dev);
 }
 RoutingTableEntry::~RoutingTableEntry ()
 {
 }
+
+
 RoutingTable::RoutingTable ()
 {
 }
@@ -95,28 +76,6 @@ RoutingTable::LookupRoute (Ipv4Address id,
     }
   std::map<Ipv4Address, RoutingTableEntry>::const_iterator i = m_ipv4AddressEntry.find (id);
   if (i == m_ipv4AddressEntry.end ())
-    {
-      return false;
-    }
-  rt = i->second;
-  return true;
-}
-
-bool
-RoutingTable::LookupRoute (Ipv4Address id,
-                           RoutingTableEntry & rt,
-                           bool forRouteInput)
-{
-  if (m_ipv4AddressEntry.empty ())
-    {
-      return false;
-    }
-  std::map<Ipv4Address, RoutingTableEntry>::const_iterator i = m_ipv4AddressEntry.find (id);
-  if (i == m_ipv4AddressEntry.end ())
-    {
-      return false;
-    }
-  if (forRouteInput == true && id == i->second.GetInterface ().GetBroadcast ())
     {
       return false;
     }
@@ -145,14 +104,14 @@ bool
 RoutingTable::AddRoute (RoutingTableEntry & rt)
 {
   std::pair<std::map<Ipv4Address, RoutingTableEntry>::iterator, bool> result = m_ipv4AddressEntry.insert (std::make_pair (
-                                                                                                            rt.GetDestination (),rt));
+                                                                                                            rt.GetAdress (),rt));
   return result.second;
 }
 
 bool
 RoutingTable::Update (RoutingTableEntry & rt)
 {
-  std::map<Ipv4Address, RoutingTableEntry>::iterator i = m_ipv4AddressEntry.find (rt.GetDestination ());
+  std::map<Ipv4Address, RoutingTableEntry>::iterator i = m_ipv4AddressEntry.find (rt.GetAdress ());
   if (i == m_ipv4AddressEntry.end ())
     {
       return false;
@@ -162,208 +121,22 @@ RoutingTable::Update (RoutingTableEntry & rt)
 }
 
 void
-RoutingTable::DeleteAllRoutesFromInterface (Ipv4InterfaceAddress iface)
-{
-  if (m_ipv4AddressEntry.empty ())
-    {
-      return;
-    }
-  for (std::map<Ipv4Address, RoutingTableEntry>::iterator i = m_ipv4AddressEntry.begin (); i != m_ipv4AddressEntry.end (); )
-    {
-      if (i->second.GetInterface () == iface)
-        {
-          std::map<Ipv4Address, RoutingTableEntry>::iterator tmp = i;
-          ++i;
-          m_ipv4AddressEntry.erase (tmp);
-        }
-      else
-        {
-          ++i;
-        }
-    }
-}
-
-void
-RoutingTable::GetListOfAllRoutes (std::map<Ipv4Address, RoutingTableEntry> & allRoutes)
-{
-  for (std::map<Ipv4Address, RoutingTableEntry>::iterator i = m_ipv4AddressEntry.begin (); i != m_ipv4AddressEntry.end (); ++i)
-    {
-      if (i->second.GetDestination () != Ipv4Address ("127.0.0.1") && i->second.GetFlag () == VALID)
-        {
-          allRoutes.insert (
-            std::make_pair (i->first,i->second));
-        }
-    }
-}
-
-void
-RoutingTable::GetListOfDestinationWithNextHop (Ipv4Address nextHop,
-                                               std::map<Ipv4Address, RoutingTableEntry> & unreachable)
-{
-  unreachable.clear ();
-  for (std::map<Ipv4Address, RoutingTableEntry>::const_iterator i = m_ipv4AddressEntry.begin (); i
-       != m_ipv4AddressEntry.end (); ++i)
-    {
-      if (i->second.GetNextHop () == nextHop)
-        {
-          unreachable.insert (std::make_pair (i->first,i->second));
-        }
-    }
-}
-
-void
 RoutingTableEntry::Print (Ptr<OutputStreamWrapper> stream) const
 {
-  *stream->GetStream () << std::setiosflags (std::ios::fixed) << m_ipv4Route->GetDestination () << "\t\t" << m_ipv4Route->GetGateway () << "\t\t"
-                        << m_iface.GetLocal () << "\t\t" << std::setiosflags (std::ios::left)
-                        << std::setw (10) << m_hops << "\t" << std::setw (10) << m_seqNo << "\t"
-                        << std::setprecision (3) << (Simulator::Now () - m_lifeTime).GetSeconds ()
-                        << "s\t\t" << m_settlingTime.GetSeconds () << "s\t\t" << m_x << "\t\t" << m_y << "\t\t" << m_z << "\t\t"
+  *stream->GetStream () << std::setiosflags (std::ios::fixed) << m_x << "\t\t" << m_y << "\t\t" << m_z << "\t\t"
                         << m_vx << "\t\t" << m_vy << "\t\t" << m_vz << "\t\t" << m_timestamp << "\t\t" << m_adress << "\n";
-}
-
-void
-RoutingTable::Purge (std::map<Ipv4Address, RoutingTableEntry> & removedAddresses)
-{
-  if (m_ipv4AddressEntry.empty ())
-    {
-      return;
-    }
-  for (std::map<Ipv4Address, RoutingTableEntry>::iterator i = m_ipv4AddressEntry.begin (); i != m_ipv4AddressEntry.end (); )
-    {
-      std::map<Ipv4Address, RoutingTableEntry>::iterator itmp = i;
-      if (i->second.GetLifeTime () > m_holddownTime && (i->second.GetHop () > 0))
-        {
-          for (std::map<Ipv4Address, RoutingTableEntry>::iterator j = m_ipv4AddressEntry.begin (); j != m_ipv4AddressEntry.end (); )
-            {
-              if ((j->second.GetNextHop () == i->second.GetDestination ()) && (i->second.GetHop () != j->second.GetHop ()))
-                {
-                  std::map<Ipv4Address, RoutingTableEntry>::iterator jtmp = j;
-                  removedAddresses.insert (std::make_pair (j->first,j->second));
-                  ++j;
-                  m_ipv4AddressEntry.erase (jtmp);
-                }
-              else
-                {
-                  ++j;
-                }
-            }
-          removedAddresses.insert (std::make_pair (i->first,i->second));
-          ++i;
-          m_ipv4AddressEntry.erase (itmp);
-        }
-      /** \todo Need to decide when to invalidate a route */
-      /*          else if (i->second.GetLifeTime() > m_holddownTime)
-       {
-       ++i;
-       itmp->second.SetFlag(INVALID);
-       }*/
-      else
-        {
-          ++i;
-        }
-    }
-  return;
 }
 
 void
 RoutingTable::Print (Ptr<OutputStreamWrapper> stream) const
 {
-  *stream->GetStream () << "\n myprotocol Routing table\n" << "Destination\t\tGateway\t\tInterface\t\tHopCount\t\tSeqNum\t\tLifeTime\t\tSettlingTime\t\tx\t\ty\t\tz\t\tvx\t\tvy\t\tvz\t\ttimestamp\t\tadress\n";
+  *stream->GetStream () << "\n myprotocol Routing table\n" << "x\t\ty\t\tz\t\tvx\t\tvy\t\tvz\t\ttimestamp\t\tadress\n";
   for (std::map<Ipv4Address, RoutingTableEntry>::const_iterator i = m_ipv4AddressEntry.begin (); i
        != m_ipv4AddressEntry.end (); ++i)
     {
       i->second.Print (stream);
     }
   *stream->GetStream () << "\n";
-}
-
-bool
-RoutingTable::AddIpv4Event (Ipv4Address address,
-                            EventId id)
-{
-  std::pair<std::map<Ipv4Address, EventId>::iterator, bool> result = m_ipv4Events.insert (std::make_pair (address,id));
-  return result.second;
-}
-
-bool
-RoutingTable::AnyRunningEvent (Ipv4Address address)
-{
-  EventId event;
-  std::map<Ipv4Address, EventId>::const_iterator i = m_ipv4Events.find (address);
-  if (m_ipv4Events.empty ())
-    {
-      return false;
-    }
-  if (i == m_ipv4Events.end ())
-    {
-      return false;
-    }
-  event = i->second;
-  if (event.IsRunning ())
-    {
-      return true;
-    }
-  else
-    {
-      return false;
-    }
-}
-
-bool
-RoutingTable::ForceDeleteIpv4Event (Ipv4Address address)
-{
-  EventId event;
-  std::map<Ipv4Address, EventId>::const_iterator i = m_ipv4Events.find (address);
-  if (m_ipv4Events.empty () || i == m_ipv4Events.end ())
-    {
-      return false;
-    }
-  event = i->second;
-  Simulator::Cancel (event);
-  m_ipv4Events.erase (address);
-  return true;
-}
-
-bool
-RoutingTable::DeleteIpv4Event (Ipv4Address address)
-{
-  EventId event;
-  std::map<Ipv4Address, EventId>::const_iterator i = m_ipv4Events.find (address);
-  if (m_ipv4Events.empty () || i == m_ipv4Events.end ())
-    {
-      return false;
-    }
-  event = i->second;
-  if (event.IsRunning ())
-    {
-      return false;
-    }
-  if (event.IsExpired ())
-    {
-      event.Cancel ();
-      m_ipv4Events.erase (address);
-      return true;
-    }
-  else
-    {
-      m_ipv4Events.erase (address);
-      return true;
-    }
-}
-
-EventId
-RoutingTable::GetEventId (Ipv4Address address)
-{
-  std::map <Ipv4Address, EventId>::const_iterator i = m_ipv4Events.find (address);
-  if (m_ipv4Events.empty () || i == m_ipv4Events.end ())
-    {
-      return EventId ();
-    }
-  else
-    {
-      return i->second;
-    }
 }
 
 // ADD:位置预测函数
@@ -375,7 +148,7 @@ RoutingTable::PredictPosition(Ipv4Address id){
     return Vector(-1,-1,-1);
   }else{
     // 先获取该节点的速度、位置、时间戳
-    uint16_t deltaTime = rt.GetTimestamp() - Simulator::Now ().ToInteger(Time::S);
+    uint16_t deltaTime = Simulator::Now ().ToInteger(Time::S) - rt.GetTimestamp();
     uint16_t newX = rt.GetX() + deltaTime * rt.GetVx();
     uint16_t newY = rt.GetY() + deltaTime * rt.GetVy();
     uint16_t newZ = rt.GetZ() + deltaTime * rt.GetVz();
@@ -402,12 +175,6 @@ RoutingTable::LookupNeighbor(std::map<Ipv4Address, RoutingTableEntry> & neighbor
 }
 
 // ADD：实现贪婪寻找最优下一条路径
-/**
- * \brief Gets next hop according to GPSR protocol
- * \param position the position of the destination node
- * \param nodePos the position of the node that has the packet
- * \return Ipv4Address of the next hop, Ipv4Address::GetZero () if no nighbour was found in greedy mode
- */
 Ipv4Address 
 RoutingTable::BestNeighbor (Ipv4Address dst, Vector myPos)
 {

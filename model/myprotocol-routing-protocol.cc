@@ -130,18 +130,6 @@ RoutingProtocol::GetTypeId (void)
                    TimeValue (Seconds (5)),
                    MakeTimeAccessor (&RoutingProtocol::m_settlingTime),
                    MakeTimeChecker ())
-    .AddAttribute ("MaxQueueLen", "Maximum number of packets that we allow a routing protocol to buffer.",
-                   UintegerValue (500 /*assuming maximum nodes in simulation is 100*/),
-                   MakeUintegerAccessor (&RoutingProtocol::m_maxQueueLen),
-                   MakeUintegerChecker<uint32_t> ())
-    .AddAttribute ("MaxQueuedPacketsPerDst", "Maximum number of packets that we allow per destination to buffer.",
-                   UintegerValue (5),
-                   MakeUintegerAccessor (&RoutingProtocol::m_maxQueuedPacketsPerDst),
-                   MakeUintegerChecker<uint32_t> ())
-    .AddAttribute ("MaxQueueTime","Maximum time packets can be queued (in seconds)",
-                   TimeValue (Seconds (30)),
-                   MakeTimeAccessor (&RoutingProtocol::m_maxQueueTime),
-                   MakeTimeChecker ())
     .AddAttribute ("EnableBuffering","Enables buffering of data packets if no route to destination is available",
                    BooleanValue (true),
                    MakeBooleanAccessor (&RoutingProtocol::SetEnableBufferFlag,
@@ -214,7 +202,6 @@ RoutingProtocol::AssignStreams (int64_t stream)
 RoutingProtocol::RoutingProtocol ()
   : m_routingTable (),
     m_advRoutingTable (),
-    m_queue (),
     m_periodicUpdateTimer (Timer::CANCEL_ON_DESTROY)
 {
   m_uniformRandomVariable = CreateObject<UniformRandomVariable> ();
@@ -252,9 +239,6 @@ RoutingProtocol::PrintRoutingTable (Ptr<OutputStreamWrapper> stream, Time::Unit 
 void
 RoutingProtocol::Start ()
 {
-  m_queue.SetMaxPacketsPerDst (m_maxQueuedPacketsPerDst);
-  m_queue.SetMaxQueueLen (m_maxQueueLen);
-  m_queue.SetQueueTimeout (m_maxQueueTime);
   m_routingTable.Setholddowntime (Time (Holdtimes * m_periodicUpdateInterval));
   m_advRoutingTable.Setholddowntime (Time (Holdtimes * m_periodicUpdateInterval));
   m_scb = MakeCallback (&RoutingProtocol::Send,this);
@@ -590,13 +574,6 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
   // RecvFrom中参数的类型是Address
   Ptr<Packet> packet = socket->RecvFrom (sourceAddress);
 
-  // todo:把下面几行不需要的信息给去掉
-  InetSocketAddress inetSourceAddr = InetSocketAddress::ConvertFrom (sourceAddress);
-  // 发送数据包的邻居的ip地址
-  Ipv4Address sender = inetSourceAddr.GetIpv4 ();
-  Ipv4Address receiver = m_socketAddresses[socket].GetLocal ();
-  Ptr<NetDevice> dev = m_ipv4->GetNetDevice (m_ipv4->GetInterfaceForAddress (receiver));
-
   MyprotocolHeader myprotocolHeader;
   packet->RemoveHeader (myprotocolHeader);
   Ipv4Address source = myprotocolHeader.GetMyadress();         //是哪个节点的位置信息
@@ -607,15 +584,6 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
   // 是从std::map<Ipv4Address, RoutingTableEntry>中找Ipv4Address
   if(!m_routingTable.LookupRoute(source,rt)){       //如果位置表中没有该表项，则添加
     RoutingTableEntry newEntry (
-      /*device=*/ dev, /*dst=*/
-      myprotocolHeader.GetDst (), /*seqno=*/
-      myprotocolHeader.GetDstSeqno (),
-      /*iface=*/ m_ipv4->GetAddress (m_ipv4->GetInterfaceForAddress (receiver), 0),
-      /*hops=*/ myprotocolHeader.GetHopCount (), /*next hop=*/
-      sender, /*lifetime=*/
-      Simulator::Now (), /*settlingTime*/
-      m_settlingTime, /*entries changed*/
-      true,
       myprotocolHeader.GetX(),
       myprotocolHeader.GetY(),
       myprotocolHeader.GetZ(),
@@ -701,14 +669,7 @@ RoutingProtocol::SetIpv4 (Ptr<Ipv4> ipv4)
   // Remember lo route
   // ADD：修改初始回环地址的路由表项
   RoutingTableEntry rt (
-    /*device=*/ m_lo,  /*dst=*/
-    Ipv4Address::GetLoopback (), /*seqno=*/
-    0,
-    /*iface=*/ Ipv4InterfaceAddress (Ipv4Address::GetLoopback (),Ipv4Mask ("255.0.0.0")),
-    /*hops=*/ 0,  /*next hop=*/
-    Ipv4Address::GetLoopback (),
-    /*lifetime=*/ Simulator::GetMaximumSimulationTime (),
-    /*SettlingTime=*/Simulator::Now (), /* changedEntries */false, /* x */0, /* y */0, /* z */0, /* vx */0, /* vy */0, /* vz */0,
+    /* x */0, /* y */0, /* z */0, /* vx */0, /* vy */0, /* vz */0,
     /* timestamp */0, /* adress */Ipv4Address::GetLoopback ());
   // rt.SetFlag (INVALID);
   // rt.SetEntriesChanged (false);
@@ -737,10 +698,7 @@ RoutingProtocol::NotifyInterfaceUp (uint32_t i)
   socket->SetAttribute ("IpTtl",UintegerValue (1));
   m_socketAddresses.insert (std::make_pair (socket,iface));
   // Add local broadcast record to the routing table
-  Ptr<NetDevice> dev = m_ipv4->GetNetDevice (m_ipv4->GetInterfaceForAddress (iface.GetLocal ()));
-  RoutingTableEntry rt (/*device=*/ dev, /*dst=*/ iface.GetBroadcast (), /*seqno=*/ 0,/*iface=*/ iface,/*hops=*/ 0,
-                                    /*next hop=*/ iface.GetBroadcast (), /*lifetime=*/ Simulator::GetMaximumSimulationTime (),
-                                    /*SettlingTime=*/Simulator::Now (), /* changedEntries */false, /* x */0, /* y */0, /* z */0, /* vx */0, /* vy */0, /* vz */0,
+  RoutingTableEntry rt (/* x */0, /* y */0, /* z */0, /* vx */0, /* vy */0, /* vz */0,
                                     /* timestamp */0, /* adress */Ipv4Address::GetLoopback ());
   m_routingTable.AddRoute (rt);
   if (m_mainAddress == Ipv4Address ())
@@ -765,8 +723,6 @@ RoutingProtocol::NotifyInterfaceDown (uint32_t i)
       m_routingTable.Clear ();
       return;
     }
-  m_routingTable.DeleteAllRoutesFromInterface (m_ipv4->GetAddress (i,0));
-  m_advRoutingTable.DeleteAllRoutesFromInterface (m_ipv4->GetAddress (i,0));
 }
 
 void
@@ -795,10 +751,7 @@ RoutingProtocol::NotifyAddAddress (uint32_t i,
       socket->Bind (InetSocketAddress (Ipv4Address::GetAny (), MYPROTOCOL_PORT));
       socket->SetAllowBroadcast (true);
       m_socketAddresses.insert (std::make_pair (socket,iface));
-      Ptr<NetDevice> dev = m_ipv4->GetNetDevice (m_ipv4->GetInterfaceForAddress (iface.GetLocal ()));
-      RoutingTableEntry rt (/*device=*/ dev, /*dst=*/ iface.GetBroadcast (),/*seqno=*/ 0, /*iface=*/ iface,/*hops=*/ 0,
-                                        /*next hop=*/ iface.GetBroadcast (), /*lifetime=*/ Simulator::GetMaximumSimulationTime (),
-                                        /*SettlingTime=*/Simulator::Now (), /* changedEntries */false, /* x */0, /* y */0, /* z */0, /* vx */0, /* vy */0, /* vz */0,
+      RoutingTableEntry rt (/* x */0, /* y */0, /* z */0, /* vx */0, /* vy */0, /* vz */0,
                                         /* timestamp */0, /* adress */Ipv4Address::GetLoopback ());
       m_routingTable.AddRoute (rt);
     }

@@ -5,7 +5,6 @@ def build(bld):
     module.includes = '.'
     module.source = [
         'model/myprotocol-rtable.cc',
-        'model/myprotocol-packet-queue.cc',
         'model/myprotocol-packet.cc',
         'model/myprotocol-routing-protocol.cc',
         'helper/myprotocol-helper.cc',
@@ -20,7 +19,6 @@ def build(bld):
     headers.module = 'myprotocol'
     headers.source = [
         'model/myprotocol-rtable.h',
-        'model/myprotocol-packet-queue.h',
         'model/myprotocol-packet.h',
         'model/myprotocol-routing-protocol.h',
         'helper/myprotocol-helper.h',

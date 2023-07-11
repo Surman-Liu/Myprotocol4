@@ -34,7 +34,6 @@
 #define MYPROTOCOL_ROUTING_PROTOCOL_H
 
 #include "myprotocol-rtable.h"
-#include "myprotocol-packet-queue.h"
 #include "myprotocol-packet.h"
 #include "ns3/node.h"
 #include "ns3/random-variable-stream.h"
@@ -157,14 +156,6 @@ private:
   RoutingTable m_routingTable;
   /// Advertised Routing table for the node
   RoutingTable m_advRoutingTable;
-  /// The maximum number of packets that we allow a routing protocol to buffer.
-  uint32_t m_maxQueueLen;
-  /// The maximum number of packets that we allow per destination to buffer.
-  uint32_t m_maxQueuedPacketsPerDst;
-  /// The maximum period of time that a routing protocol is allowed to buffer a packet for.
-  Time m_maxQueueTime;
-  /// A "drop front on full" queue used by the routing layer to buffer packets to which it does not have a route.
-  PacketQueue m_queue;
   /// Flag that is used to enable or disable buffering
   bool EnableBuffering;
   /// Flag that is used to enable or disable Weighted Settling Time
@@ -194,16 +185,6 @@ private:
    */
   void
   DeferredRouteOutput (Ptr<const Packet> p, const Ipv4Header & header, UnicastForwardCallback ucb, ErrorCallback ecb);
-  /// Look for any queued packets to send them out
-  // void
-  // LookForQueuedPackets (void);
-  /**
-   * Send packet from queue
-   * \param dst - destination address to which we are sending the packet to
-   * \param route - route identified for this packet
-   */
-  // void
-  // SendPacketFromQueue (Ipv4Address dst, Ptr<Ipv4Route> route);
   /**
    * Find socket with local interface address iface
    * \param iface the interface
