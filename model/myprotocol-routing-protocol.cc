@@ -201,7 +201,6 @@ RoutingProtocol::AssignStreams (int64_t stream)
 
 RoutingProtocol::RoutingProtocol ()
   : m_routingTable (),
-    m_advRoutingTable (),
     m_periodicUpdateTimer (Timer::CANCEL_ON_DESTROY)
 {
   m_uniformRandomVariable = CreateObject<UniformRandomVariable> ();
@@ -239,8 +238,6 @@ RoutingProtocol::PrintRoutingTable (Ptr<OutputStreamWrapper> stream, Time::Unit 
 void
 RoutingProtocol::Start ()
 {
-  m_routingTable.Setholddowntime (Time (Holdtimes * m_periodicUpdateInterval));
-  m_advRoutingTable.Setholddowntime (Time (Holdtimes * m_periodicUpdateInterval));
   m_scb = MakeCallback (&RoutingProtocol::Send,this);
   m_ecb = MakeCallback (&RoutingProtocol::Drop,this);
   m_periodicUpdateTimer.SetFunction (&RoutingProtocol::SendPeriodicUpdate,this);
@@ -566,13 +563,14 @@ RoutingProtocol::LoopbackRoute (const Ipv4Header & hdr, Ptr<NetDevice> oif) cons
   return rt;
 }
 
-// 只会处理控制包
+// 只会处理控制包,即MyprotocolHeader
 void
 RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
 {
   Address sourceAddress;
   // RecvFrom中参数的类型是Address
   Ptr<Packet> packet = socket->RecvFrom (sourceAddress);
+  // std::cout<<"packet size = "<<packet->GetSize()<<"\n";
 
   MyprotocolHeader myprotocolHeader;
   packet->RemoveHeader (myprotocolHeader);
@@ -603,6 +601,7 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
       rt.SetVz(velocity.z);
       rt.SetTimestamp(myprotocolHeader.GetTimestamp());
       rt.SetAdress(myprotocolHeader.GetMyadress());
+      m_routingTable.Update(rt);
     }
   }
 }
@@ -619,6 +618,11 @@ RoutingProtocol::SendPeriodicUpdate ()
   int16_t vz = (int16_t)myVel.z;
   uint16_t sign = SetRightVelocity(vx,vy,vz);
 
+  // 在位置表中更新一下自己的位置信息，方便打印路由表分析
+  RoutingTableEntry rt (/* x */(uint16_t)myPos.x, /* y */(uint16_t)myPos.y, /* z */(uint16_t)myPos.z, /* vx */vx, /* vy */vy, /* vz */vz,
+                                    /* timestamp */Simulator::Now ().ToInteger(Time::S), /* adress */Ipv4Address::GetLoopback ());
+  m_routingTable.Update(rt);
+
   MyprotocolHeader myprotocolHeader;
   myprotocolHeader.SetX((uint16_t)myPos.x);
   myprotocolHeader.SetY((uint16_t)myPos.y);
@@ -629,6 +633,7 @@ RoutingProtocol::SendPeriodicUpdate ()
   myprotocolHeader.SetSign(sign);
   myprotocolHeader.SetTimestamp(Simulator::Now ().ToInteger(Time::S));
   myprotocolHeader.SetMyadress(m_ipv4->GetAddress (1, 0).GetLocal ());
+  // std::cout<<"send timestamp = "<<Simulator::Now ().ToInteger(Time::S)<<"; myadress = "<<m_ipv4->GetAddress (1, 0).GetLocal ()<<"\n";
 
   Ptr<Packet> packet = Create<Packet> ();
   packet->AddHeader (myprotocolHeader);
@@ -699,7 +704,7 @@ RoutingProtocol::NotifyInterfaceUp (uint32_t i)
   m_socketAddresses.insert (std::make_pair (socket,iface));
   // Add local broadcast record to the routing table
   RoutingTableEntry rt (/* x */0, /* y */0, /* z */0, /* vx */0, /* vy */0, /* vz */0,
-                                    /* timestamp */0, /* adress */Ipv4Address::GetLoopback ());
+                                    /* timestamp */0, /* adress */iface.GetBroadcast ());
   m_routingTable.AddRoute (rt);
   if (m_mainAddress == Ipv4Address ())
     {
@@ -752,7 +757,7 @@ RoutingProtocol::NotifyAddAddress (uint32_t i,
       socket->SetAllowBroadcast (true);
       m_socketAddresses.insert (std::make_pair (socket,iface));
       RoutingTableEntry rt (/* x */0, /* y */0, /* z */0, /* vx */0, /* vy */0, /* vz */0,
-                                        /* timestamp */0, /* adress */Ipv4Address::GetLoopback ());
+                                        /* timestamp */0, /* adress */iface.GetBroadcast ());
       m_routingTable.AddRoute (rt);
     }
 }

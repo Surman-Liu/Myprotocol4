@@ -70,12 +70,12 @@ bool
 RoutingTable::LookupRoute (Ipv4Address id,
                            RoutingTableEntry & rt)
 {
-  if (m_ipv4AddressEntry.empty ())
+  if (m_positionTable.empty ())
     {
       return false;
     }
-  std::map<Ipv4Address, RoutingTableEntry>::const_iterator i = m_ipv4AddressEntry.find (id);
-  if (i == m_ipv4AddressEntry.end ())
+  std::map<Ipv4Address, RoutingTableEntry>::const_iterator i = m_positionTable.find (id);
+  if (i == m_positionTable.end ())
     {
       return false;
     }
@@ -86,7 +86,7 @@ RoutingTable::LookupRoute (Ipv4Address id,
 bool
 RoutingTable::DeleteRoute (Ipv4Address dst)
 {
-  if (m_ipv4AddressEntry.erase (dst) != 0)
+  if (m_positionTable.erase (dst) != 0)
     {
       // NS_LOG_DEBUG("Route erased");
       return true;
@@ -97,13 +97,13 @@ RoutingTable::DeleteRoute (Ipv4Address dst)
 uint32_t
 RoutingTable::RoutingTableSize ()
 {
-  return m_ipv4AddressEntry.size ();
+  return m_positionTable.size ();
 }
 
 bool
 RoutingTable::AddRoute (RoutingTableEntry & rt)
 {
-  std::pair<std::map<Ipv4Address, RoutingTableEntry>::iterator, bool> result = m_ipv4AddressEntry.insert (std::make_pair (
+  std::pair<std::map<Ipv4Address, RoutingTableEntry>::iterator, bool> result = m_positionTable.insert (std::make_pair (
                                                                                                             rt.GetAdress (),rt));
   return result.second;
 }
@@ -111,8 +111,8 @@ RoutingTable::AddRoute (RoutingTableEntry & rt)
 bool
 RoutingTable::Update (RoutingTableEntry & rt)
 {
-  std::map<Ipv4Address, RoutingTableEntry>::iterator i = m_ipv4AddressEntry.find (rt.GetAdress ());
-  if (i == m_ipv4AddressEntry.end ())
+  std::map<Ipv4Address, RoutingTableEntry>::iterator i = m_positionTable.find (rt.GetAdress ());
+  if (i == m_positionTable.end ())
     {
       return false;
     }
@@ -131,11 +131,18 @@ void
 RoutingTable::Print (Ptr<OutputStreamWrapper> stream) const
 {
   *stream->GetStream () << "\n myprotocol Routing table\n" << "x\t\ty\t\tz\t\tvx\t\tvy\t\tvz\t\ttimestamp\t\tadress\n";
-  for (std::map<Ipv4Address, RoutingTableEntry>::const_iterator i = m_ipv4AddressEntry.begin (); i
-       != m_ipv4AddressEntry.end (); ++i)
+  for (std::map<Ipv4Address, RoutingTableEntry>::const_iterator i = m_positionTable.begin (); i
+       != m_positionTable.end (); ++i)
     {
       i->second.Print (stream);
     }
+  *stream->GetStream () << "=====================neighbor table=======================\n";
+  for (std::map<Ipv4Address, RoutingTableEntry>::const_iterator i = m_neiborTable.begin (); i
+       != m_neiborTable.end (); ++i)
+    {
+      i->second.Print (stream);
+    }
+
   *stream->GetStream () << "\n";
 }
 
@@ -148,11 +155,12 @@ RoutingTable::PredictPosition(Ipv4Address id){
     return Vector(-1,-1,-1);
   }else{
     // 先获取该节点的速度、位置、时间戳
-    uint16_t deltaTime = Simulator::Now ().ToInteger(Time::S) - rt.GetTimestamp();
-    uint16_t newX = rt.GetX() + deltaTime * rt.GetVx();
-    uint16_t newY = rt.GetY() + deltaTime * rt.GetVy();
-    uint16_t newZ = rt.GetZ() + deltaTime * rt.GetVz();
-    return Vector(newX, newY, newZ);
+    // uint16_t deltaTime = Simulator::Now ().ToInteger(Time::S) - rt.GetTimestamp();
+    // std::cout<<"deltaTime = "<<deltaTime<<"; now = "<<Simulator::Now ().ToInteger(Time::S)<<"; timestamp = "<<rt.GetTimestamp()<<"\n";
+    // uint16_t newX = rt.GetX() + deltaTime * rt.GetVx();
+    // uint16_t newY = rt.GetY() + deltaTime * rt.GetVy();
+    // uint16_t newZ = rt.GetZ() + deltaTime * rt.GetVz();
+    return Vector(rt.GetX(), rt.GetY(), rt.GetZ());
   }
 }
 
@@ -161,7 +169,9 @@ void
 RoutingTable::LookupNeighbor(std::map<Ipv4Address, RoutingTableEntry> & neighborTable, Vector myPos){
   // 传输范围250m
   uint16_t TransmissionRange = 250;
-  for (std::map<Ipv4Address, RoutingTableEntry>::iterator i = m_ipv4AddressEntry.begin (); i != m_ipv4AddressEntry.end (); i++){
+  m_neiborTable.clear();
+  for (std::map<Ipv4Address, RoutingTableEntry>::iterator i = m_positionTable.begin (); i != m_positionTable.end (); i++){
+    RoutingTableEntry rt = i->second;
     Vector predictPos = PredictPosition(i->first);
     if(CalculateDistance (predictPos, Vector(-1,-1,-1)) == 0){
       continue;
@@ -170,6 +180,7 @@ RoutingTable::LookupNeighbor(std::map<Ipv4Address, RoutingTableEntry> & neighbor
     // 距离小于传输范围，可以认为是邻居
     if(distance <= TransmissionRange){
       neighborTable.insert(std::make_pair(i->first,i->second));
+      m_neiborTable.insert(std::make_pair(i->first,i->second));
     }
   }
 }
@@ -189,8 +200,8 @@ RoutingTable::BestNeighbor (Ipv4Address dst, Vector myPos)
 
   if (neighborTable.empty ())
     {
-      std::cout<<"BestNeighbor table is empty!!!\n";
-      NS_LOG_DEBUG ("BestNeighbor table is empty");
+      std::cout<<"Neighbor table is empty!!!\n";
+      NS_LOG_DEBUG ("Neighbor table is empty");
       return Ipv4Address::GetZero ();
     }     //if table is empty (no neighbours)
   Ipv4Address bestFoundID = neighborTable.begin ()->first;
@@ -205,6 +216,7 @@ RoutingTable::BestNeighbor (Ipv4Address dst, Vector myPos)
   if(initialDistance > bestFoundDistance){
     return bestFoundID;
   }else{
+    std::cout<<"There is no closer neighbor!!!\n";
     return Ipv4Address::GetZero (); //so it enters Recovery-mode
   }
 }

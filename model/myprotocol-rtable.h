@@ -187,7 +187,7 @@ public:
   void
   Clear ()
   {
-    m_ipv4AddressEntry.clear ();
+    m_positionTable.clear ();
   }
   /**
    * Print routing table
@@ -201,23 +201,6 @@ public:
    */
   uint32_t
   RoutingTableSize ();
-
-  /**
-   * Get hold down time (time until an invalid route may be deleted)
-   * \returns the hold down time
-   */
-  Time Getholddowntime () const
-  {
-    return m_holddownTime;
-  }
-  /**
-   * Set hold down time (time until an invalid route may be deleted)
-   * \param t the hold down time
-   */
-  void Setholddowntime (Time t)
-  {
-    m_holddownTime = t;
-  }
 
   // ADD: 位置预测函数
   Vector PredictPosition(Ipv4Address id);
@@ -240,12 +223,9 @@ public:
 private:
   // Fields
   /// an entry in the routing table.
-  std::map<Ipv4Address, RoutingTableEntry> m_ipv4AddressEntry;
-  /// an entry in the event table.
-  std::map<Ipv4Address, EventId> m_ipv4Events;
-  /// hold down time of an expired route
-  Time m_holddownTime;
-
+  std::map<Ipv4Address, RoutingTableEntry> m_positionTable;
+  /// neighbor table
+  std::map<Ipv4Address, RoutingTableEntry> m_neiborTable;
 };
 }
 }

@@ -154,8 +154,6 @@ private:
   Ptr<NetDevice> m_lo;
   /// Main Routing table for the node
   RoutingTable m_routingTable;
-  /// Advertised Routing table for the node
-  RoutingTable m_advRoutingTable;
   /// Flag that is used to enable or disable buffering
   bool EnableBuffering;
   /// Flag that is used to enable or disable Weighted Settling Time
