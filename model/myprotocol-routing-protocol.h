@@ -90,38 +90,6 @@ public:
   virtual void NotifyRemoveAddress (uint32_t interface, Ipv4InterfaceAddress address);
   virtual void SetIpv4 (Ptr<Ipv4> ipv4);
 
-  // Methods to handle protocol parameters
-  /**
-   * Set enable buffer flag
-   * \param f The enable buffer flag
-   */
-  void SetEnableBufferFlag (bool f);
-  /**
-   * Get enable buffer flag
-   * \returns the enable buffer flag
-   */
-  bool GetEnableBufferFlag () const;
-  /**
-   * Set weighted settling time (WST) flag
-   * \param f the weighted settling time (WST) flag
-   */
-  void SetWSTFlag (bool f);
-  /**
-   * Get weighted settling time (WST) flag
-   * \returns the weighted settling time (WST) flag
-   */
-  bool GetWSTFlag () const;
-  /**
-   * Set enable route aggregation (RA) flag
-   * \param f the enable route aggregation (RA) flag
-   */
-  void SetEnableRAFlag (bool f);
-  /**
-   * Get enable route aggregation (RA) flag
-   * \returns the enable route aggregation (RA) flag
-   */
-  bool GetEnableRAFlag () const;
-
   /**
    * Assign a fixed random variable stream number to the random variables
    * used by this model.  Return the number of streams (possibly zero) that
@@ -134,16 +102,9 @@ public:
 
 private:
   // Protocol parameters.
-  /// Holdtimes is the multiplicative factor of PeriodicUpdateInterval for which the node waits since the last update
-  /// before flushing a route from the routing table. If PeriodicUpdateInterval is 8s and Holdtimes is 3, the node
-  /// waits for 24s since the last update to flush this route from its routing table.
-  uint32_t Holdtimes;
   /// PeriodicUpdateInterval specifies the periodic time interval between which the a node broadcasts
   /// its entire routing table.
   Time m_periodicUpdateInterval;
-  /// SettlingTime specifies the time for which a node waits before propagating an update.
-  /// It waits for this time interval in hope of receiving an update with a better metric.
-  Time m_settlingTime;
   /// Nodes IP address
   Ipv4Address m_mainAddress;
   /// IP protocol
@@ -156,15 +117,6 @@ private:
   RoutingTable m_routingTable;
   /// Flag that is used to enable or disable buffering
   bool EnableBuffering;
-  /// Flag that is used to enable or disable Weighted Settling Time
-  bool EnableWST;
-  /// This is the wighted factor to determine the weighted settling time
-  double m_weightedFactor;
-  /// This is a flag to enable route aggregation. Route aggregation will aggregate all routes for
-  /// 'RouteAggregationTime' from the time an update is received by a node and sends them as a single update .
-  bool EnableRouteAggregation;
-  /// Parameter that holds the route aggregation time interval
-  Time m_routeAggregationTime;
   /// Unicast callback for own packets
   UnicastForwardCallback m_scb;
   /// Error callback for own packets
@@ -293,10 +245,11 @@ private:
   /// ADD： If route exists and valid, forward packet.
   bool Forwarding (Ptr<const Packet> p, const Ipv4Header & header, UnicastForwardCallback ucb, ErrorCallback ecb);
 
+  // ADD:恢复模式
+  Ipv4Address RecoveryMode(Ipv4Address dst, Ptr<Packet> p, Ipv4Header header);
+
   /// Timer to trigger periodic updates from a node
   Timer m_periodicUpdateTimer;
-  /// Timer used by the trigger updates in case of Weighted Settling Time is used
-  Timer m_triggeredExpireTimer;
 
   /// Provides uniform random variables.
   Ptr<UniformRandomVariable> m_uniformRandomVariable;

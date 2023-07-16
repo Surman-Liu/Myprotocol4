@@ -171,6 +171,9 @@ RoutingTable::LookupNeighbor(std::map<Ipv4Address, RoutingTableEntry> & neighbor
   uint16_t TransmissionRange = 250;
   m_neiborTable.clear();
   for (std::map<Ipv4Address, RoutingTableEntry>::iterator i = m_positionTable.begin (); i != m_positionTable.end (); i++){
+    if(i->first == Ipv4Address::GetLoopback () || i->first == Ipv4Address("10.1.1.255") || i->first == Ipv4Address("255.255.255.255")){
+      continue;
+    }
     RoutingTableEntry rt = i->second;
     Vector predictPos = PredictPosition(i->first);
     if(CalculateDistance (predictPos, Vector(-1,-1,-1)) == 0){
@@ -187,16 +190,16 @@ RoutingTable::LookupNeighbor(std::map<Ipv4Address, RoutingTableEntry> & neighbor
 
 // ADD：实现贪婪寻找最优下一条路径
 Ipv4Address 
-RoutingTable::BestNeighbor (Ipv4Address dst, Vector myPos)
+RoutingTable::BestNeighbor (Vector dstPos, Vector myPos)
 {
   std::map<Ipv4Address, RoutingTableEntry> neighborTable;
   LookupNeighbor(neighborTable, myPos);
-  Vector predictDstPos = PredictPosition(dst);
-  if(CalculateDistance (predictDstPos, Vector(-1,-1,-1)) == 0){
+  // Vector predictDstPos = PredictPosition(dst);
+  if(CalculateDistance (dstPos, Vector(-1,-1,-1)) == 0){
     return Ipv4Address::GetZero ();
   }
 
-  double initialDistance = CalculateDistance (predictDstPos, myPos);
+  double initialDistance = CalculateDistance (dstPos, myPos);
 
   if (neighborTable.empty ())
     {
@@ -205,18 +208,19 @@ RoutingTable::BestNeighbor (Ipv4Address dst, Vector myPos)
       return Ipv4Address::GetZero ();
     }     //if table is empty (no neighbours)
   Ipv4Address bestFoundID = neighborTable.begin ()->first;
-  double bestFoundDistance = CalculateDistance (PredictPosition(neighborTable.begin ()->first), predictDstPos);
+  double bestFoundDistance = CalculateDistance (PredictPosition(neighborTable.begin ()->first), dstPos);
 
   for (std::map<Ipv4Address, RoutingTableEntry>::iterator i = neighborTable.begin (); i != neighborTable.end (); i++){
-    if(bestFoundDistance > CalculateDistance (PredictPosition(i->first), predictDstPos)){
+    if(bestFoundDistance > CalculateDistance (PredictPosition(i->first), dstPos)){
       bestFoundID = i->first;
-      bestFoundDistance = CalculateDistance (PredictPosition(i->first), predictDstPos);
+      bestFoundDistance = CalculateDistance (PredictPosition(i->first), dstPos);
     }
   }  
   if(initialDistance > bestFoundDistance){
     return bestFoundID;
   }else{
     std::cout<<"There is no closer neighbor!!!\n";
+    std::cout<<"zero = "<<Ipv4Address::GetZero ()<<"\n";
     return Ipv4Address::GetZero (); //so it enters Recovery-mode
   }
 }

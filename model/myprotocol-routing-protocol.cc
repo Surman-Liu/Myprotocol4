@@ -39,6 +39,8 @@
 #include "ns3/boolean.h"
 #include "ns3/double.h"
 #include "ns3/uinteger.h"
+#include "ns3/random-variable-stream.h"
+#include "ns3/rng-seed-manager.h"
 
 namespace ns3 {
 
@@ -124,71 +126,8 @@ RoutingProtocol::GetTypeId (void)
     .AddAttribute ("PeriodicUpdateInterval","Periodic interval between exchange of full routing tables among nodes. ",
                    TimeValue (Seconds (10)),
                    MakeTimeAccessor (&RoutingProtocol::m_periodicUpdateInterval),
-                   MakeTimeChecker ())
-    .AddAttribute ("SettlingTime", "Minimum time an update is to be stored in adv table before sending out"
-                   "in case of change in metric (in seconds)",
-                   TimeValue (Seconds (5)),
-                   MakeTimeAccessor (&RoutingProtocol::m_settlingTime),
-                   MakeTimeChecker ())
-    .AddAttribute ("EnableBuffering","Enables buffering of data packets if no route to destination is available",
-                   BooleanValue (true),
-                   MakeBooleanAccessor (&RoutingProtocol::SetEnableBufferFlag,
-                                        &RoutingProtocol::GetEnableBufferFlag),
-                   MakeBooleanChecker ())
-    .AddAttribute ("EnableWST","Enables Weighted Settling Time for the updates before advertising",
-                   BooleanValue (true),
-                   MakeBooleanAccessor (&RoutingProtocol::SetWSTFlag,
-                                        &RoutingProtocol::GetWSTFlag),
-                   MakeBooleanChecker ())
-    .AddAttribute ("Holdtimes","Times the forwarding Interval to purge the route.",
-                   UintegerValue (3),
-                   MakeUintegerAccessor (&RoutingProtocol::Holdtimes),
-                   MakeUintegerChecker<uint32_t> ())
-    .AddAttribute ("WeightedFactor","WeightedFactor for the settling time if Weighted Settling Time is enabled",
-                   DoubleValue (0.875),
-                   MakeDoubleAccessor (&RoutingProtocol::m_weightedFactor),
-                   MakeDoubleChecker<double> ())
-    .AddAttribute ("EnableRouteAggregation","Enables Weighted Settling Time for the updates before advertising",
-                   BooleanValue (false),
-                   MakeBooleanAccessor (&RoutingProtocol::SetEnableRAFlag,
-                                        &RoutingProtocol::GetEnableRAFlag),
-                   MakeBooleanChecker ())
-    .AddAttribute ("RouteAggregationTime","Time to aggregate updates before sending them out (in seconds)",
-                   TimeValue (Seconds (1)),
-                   MakeTimeAccessor (&RoutingProtocol::m_routeAggregationTime),
                    MakeTimeChecker ());
   return tid;
-}
-
-void
-RoutingProtocol::SetEnableBufferFlag (bool f)
-{
-  EnableBuffering = f;
-}
-bool
-RoutingProtocol::GetEnableBufferFlag () const
-{
-  return EnableBuffering;
-}
-void
-RoutingProtocol::SetWSTFlag (bool f)
-{
-  EnableWST = f;
-}
-bool
-RoutingProtocol::GetWSTFlag () const
-{
-  return EnableWST;
-}
-void
-RoutingProtocol::SetEnableRAFlag (bool f)
-{
-  EnableRouteAggregation = f;
-}
-bool
-RoutingProtocol::GetEnableRAFlag () const
-{
-  return EnableRouteAggregation;
 }
 
 int64_t
@@ -279,49 +218,64 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p,
     route->SetSource(m_ipv4->GetAddress (1, 0).GetLocal ());
     route->SetOutputDevice(m_ipv4->GetNetDevice (1));
     return route;
-  }
-  else{
+  }else{
     // 目的地是单播，则是一个数据包，需要添加贪婪转发状态的包头，再进行贪婪转发。
     DataHeader dataHeader;
-    Ipv4Address nexthop = m_routingTable.BestNeighbor(dst,myPos);
-    if(nexthop != Ipv4Address::GetZero ()){
-      RoutingTableEntry rt;
-      m_routingTable.LookupRoute(dst,rt);
+    RoutingTableEntry rt;
+    if(m_routingTable.LookupRoute(dst,rt)){
+      Vector dstPos;
+      dstPos.x = rt.GetX();
+      dstPos.y = rt.GetY();
+      dstPos.z = rt.GetZ();
+      Ipv4Address nexthop = m_routingTable.BestNeighbor(dstPos,myPos);
       dataHeader.SetDstPosx(rt.GetX());
       dataHeader.SetDstPosy(rt.GetY());
       dataHeader.SetDstPosz(rt.GetZ());
-      dataHeader.SetUpdated(rt.GetTimestamp());
-      dataHeader.SetRecPosx(0);
-      dataHeader.SetRecPosy(0);
-      dataHeader.SetRecPosz(0);
-      dataHeader.SetInRec(0);
-      dataHeader.SetLastPosx((uint16_t)myPos.x);
-      dataHeader.SetLastPosy((uint16_t)myPos.y);
-      dataHeader.SetLastPosz((uint16_t)myPos.z);
-      p->AddHeader(dataHeader);
-      route->SetDestination(header.GetDestination ());
-      route->SetGateway(nexthop);
-      if (header.GetSource () == Ipv4Address ("102.102.102.102"))
-        {
-          route->SetSource (m_ipv4->GetAddress (1, 0).GetLocal ());
+      dataHeader.SetTimestamp(rt.GetTimestamp());
+      // 数据包找到了合适的下一跳
+      if(nexthop != Ipv4Address::GetZero ()){
+        dataHeader.SetRecPosx(0);
+        dataHeader.SetRecPosy(0);
+        dataHeader.SetRecPosz(0);
+        dataHeader.SetInRec(0);
+        p->AddHeader(dataHeader);
+        route->SetDestination(dst);
+        route->SetGateway(nexthop);
+        if (header.GetSource () == Ipv4Address ("102.102.102.102"))
+          {
+            route->SetSource (m_ipv4->GetAddress (1, 0).GetLocal ());
+          }
+        else
+          {
+            route->SetSource (header.GetSource ());
+          }
+        route->SetOutputDevice (m_ipv4->GetNetDevice (1));
+        return route;
+      }else{
+        // 没有找到合适的下一跳,符合恢复转发的条件（有目的地位置，有可转发邻居）
+        if(m_routingTable.MatchRecovery(dst,myPos)){
+          dataHeader.SetRecPosx((uint16_t)myPos.x);
+          dataHeader.SetRecPosy((uint16_t)myPos.y);
+          dataHeader.SetRecPosz((uint16_t)myPos.z);
+          dataHeader.SetInRec(1);
+          p->AddHeader(dataHeader);
+          // 恢复模式获得下一跳
+          Ipv4Address nexthop = RecoveryMode (dst, p, header);
+          Ptr<Ipv4Route> route = Create<Ipv4Route> ();
+          route->SetDestination (dst);
+          route->SetGateway (nexthop);
+          if (header.GetSource () == Ipv4Address ("102.102.102.102"))
+          {
+            route->SetSource (m_ipv4->GetAddress (1, 0).GetLocal ());
+          }else{
+            route->SetSource (header.GetSource ());
+          }
+          route->SetOutputDevice (m_ipv4->GetNetDevice (1));  
+          return route;
         }
-      else
-        {
-          route->SetSource (header.GetSource ());
-        }
-      route->SetOutputDevice (m_ipv4->GetNetDevice (1));
-
-      return route;
+      }
     }
   }
-
-  // todo
-  // 没有找到合适的下一跳,符合恢复转发的条件（有目的地位置，有可转发邻居）
-  // if(m_routingTable.MatchRecovery(dst,myPos)){
-  //   // todo: 恢复模式获得下一跳
-  //   return route;
-  // }
-
   // 没有目的地的地址/没有邻居
   return LoopbackRoute (header,oif);
 }
@@ -417,25 +371,34 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
   Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
   Vector myPos = MM->GetPosition();
 
-  uint16_t updated = 0;
   Vector DstPosition;
   Vector RecPosition;
   uint16_t inRec = 0;
-  Vector previousHop;
 
   DataHeader dataHeader;
   p->RemoveHeader(dataHeader);
-  DstPosition.x = dataHeader.GetDstPosx ();
-  DstPosition.y = dataHeader.GetDstPosy ();
-  DstPosition.z = dataHeader.GetDstPosz ();
-  updated = dataHeader.GetUpdated ();
   RecPosition.x = dataHeader.GetRecPosx ();
   RecPosition.y = dataHeader.GetRecPosy ();
   RecPosition.z = dataHeader.GetRecPosz ();
   inRec = dataHeader.GetInRec ();
-  previousHop.x = dataHeader.GetLastPosx ();
-  previousHop.y = dataHeader.GetLastPosy ();
-  previousHop.z = dataHeader.GetLastPosz ();
+  DstPosition.x = dataHeader.GetDstPosx ();
+  DstPosition.y = dataHeader.GetDstPosy ();
+  DstPosition.z = dataHeader.GetDstPosz ();
+
+  RoutingTableEntry rt;
+  if(m_routingTable.LookupRoute(dst,rt)){
+    // 更新目的地的最近地址
+    if(rt.GetTimestamp() > dataHeader.GetTimestamp ()){
+      // 该节点的目的地地址更新
+      dataHeader.SetDstPosx(rt.GetX());
+      dataHeader.SetDstPosy(rt.GetY());
+      dataHeader.SetDstPosz(rt.GetZ());
+      dataHeader.SetTimestamp(rt.GetTimestamp());
+      DstPosition.x = rt.GetX();
+      DstPosition.y = rt.GetY();
+      DstPosition.z = rt.GetZ();
+    }
+  }
 
   Ipv4Address nextHop;
   std::map<Ipv4Address, RoutingTableEntry> neighborTable;
@@ -445,9 +408,7 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
   if(i != neighborTable.end ())
     {
       nextHop = dst;
-      DataHeader dthdr ((uint16_t)DstPosition.x, (uint16_t)DstPosition.y, (uint16_t)DstPosition.y, updated, 0, 0, 0, 0, 
-                        (uint16_t)myPos.x, (uint16_t)myPos.y, (uint16_t)myPos.z);
-      p->AddHeader (dthdr);
+      p->AddHeader (dataHeader);
       Ptr<Ipv4Route> route = Create<Ipv4Route> ();
       route->SetDestination (dst);
       route->SetGateway (dst);
@@ -467,23 +428,24 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
   }
   // 如果数据包本身就是恢复模式，并且该节点到目的地的距离比进入恢复模式到目的地的距离更远，则继续恢复模式
   if(inRec == 1){
-    dataHeader.SetLastPosx ((uint16_t)myPos.x); //when entering Recovery, the first edge is the Dst
-    dataHeader.SetLastPosy ((uint16_t)myPos.y); 
-    dataHeader.SetLastPosz ((uint16_t)myPos.z);
     p->AddHeader (dataHeader);
-    // todo:恢复模式
-    // RecoveryMode (dst, p, ucb, header);
-    // return true;
-    return false;
+    // 恢复模式
+    nextHop = RecoveryMode (dst, p, header);
+    Ptr<Ipv4Route> route = Create<Ipv4Route> ();
+    route->SetDestination (dst);
+    route->SetSource (header.GetSource ());
+    route->SetGateway (nextHop);
+    route->SetOutputDevice (m_ipv4->GetNetDevice (1));  
+    return true;
   }
   if(inRec == 0){     //贪婪模式
     // 使用贪婪来寻找邻居表中离目的地最近的下一跳。
-    nextHop = m_routingTable.BestNeighbor (dst, myPos);
+    // todo，这里应该自己传入目的地的坐标
+    nextHop = m_routingTable.BestNeighbor (DstPosition, myPos);
     if (nextHop != Ipv4Address::GetZero ())
     {
-      DataHeader dthdr (DstPosition.x, DstPosition.y, DstPosition.z, updated, 0, 0, 0, 0, 
-                                (uint16_t)myPos.x, (uint16_t)myPos.y, (uint16_t)myPos.z);
-      p->AddHeader (dthdr);          
+      dataHeader.SetInRec(0);
+      p->AddHeader (dataHeader);          
       Ptr<Ipv4Route> route = Create<Ipv4Route> ();
       route->SetDestination (dst);
       route->SetSource (header.GetSource ());
@@ -499,17 +461,38 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
       dataHeader.SetRecPosx ((uint16_t)myPos.x);
       dataHeader.SetRecPosy ((uint16_t)myPos.y); 
       dataHeader.SetRecPosz ((uint16_t)myPos.z);
-      dataHeader.SetLastPosx ((uint16_t)DstPosition.x); //when entering Recovery, the first edge is the Dst
-      dataHeader.SetLastPosy ((uint16_t)DstPosition.y); 
-      dataHeader.SetLastPosz ((uint16_t)DstPosition.z); 
       p->AddHeader (dataHeader);
-      // todo:恢复模式
-      // RecoveryMode (dst, p, ucb, header);
-      return false;
+      // 恢复模式
+      nextHop = RecoveryMode (dst, p, header);
+      Ptr<Ipv4Route> route = Create<Ipv4Route> ();
+      route->SetDestination (dst);
+      route->SetSource (header.GetSource ());
+      route->SetGateway (nextHop);
+      route->SetOutputDevice (m_ipv4->GetNetDevice (1));  
+      return true;
     }
   }
 
   return false;
+}
+
+// ADD：贪婪转发
+Ipv4Address 
+RoutingProtocol::RecoveryMode(Ipv4Address dst, Ptr<Packet> p, Ipv4Header header){
+  Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
+  Vector myPos = MM->GetPosition();
+  std::map<Ipv4Address, RoutingTableEntry> neighborTable;
+  m_routingTable.LookupNeighbor(neighborTable, myPos);
+  std::map<Ipv4Address, RoutingTableEntry>::iterator i = neighborTable.begin();
+
+  // 随机选择一个邻居节点
+  Ptr<UniformRandomVariable> var = CreateObject<UniformRandomVariable> ();
+  uint16_t random = var->GetInteger(0,neighborTable.size());
+  for (; random > 0 ; random--)
+    {
+        i++;
+    }
+  return i->first;
 }
 
 // 当RoutOutout没有找到合适的下一跳路由的时候会调用这个函数
@@ -521,7 +504,6 @@ RoutingProtocol::LoopbackRoute (const Ipv4Header & hdr, Ptr<NetDevice> oif) cons
   NS_ASSERT (m_lo != 0);
   Ptr<Ipv4Route> rt = Create<Ipv4Route> ();
   rt->SetDestination (hdr.GetDestination ());
-  // rt->SetSource (hdr.GetSource ());
   //
   // Source address selection here is tricky.  The loopback route is
   // returned when myprotocol does not have a route; this causes the packet
@@ -570,7 +552,12 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
   Address sourceAddress;
   // RecvFrom中参数的类型是Address
   Ptr<Packet> packet = socket->RecvFrom (sourceAddress);
-  // std::cout<<"packet size = "<<packet->GetSize()<<"\n";
+
+  //更新邻居表，以便打印路由 
+  Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
+  Vector myPos = MM->GetPosition();
+  std::map<Ipv4Address, RoutingTableEntry> neighborTable;
+  m_routingTable.LookupNeighbor(neighborTable, myPos);
 
   MyprotocolHeader myprotocolHeader;
   packet->RemoveHeader (myprotocolHeader);
@@ -604,6 +591,28 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
       m_routingTable.Update(rt);
     }
   }
+
+  // for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j
+  //      != m_socketAddresses.end (); ++j)
+  // {
+  //   Ptr<Socket> socket = j->first;
+  //   Ipv4InterfaceAddress iface = j->second;
+  //   packet->AddHeader(myprotocolHeader);
+  //   // question：这个send函数在这里有什么用？？？
+  //   socket->Send (packet);
+  //   // Send to all-hosts broadcast if on /32 addr, subnet-directed otherwise
+  //   Ipv4Address destination;
+  //   if (iface.GetMask () == Ipv4Mask::GetOnes ())
+  //     {
+  //       destination = Ipv4Address ("255.255.255.255");
+  //     }
+  //   else
+  //     {
+  //       destination = iface.GetBroadcast ();
+  //     }
+  //   socket->SendTo (packet, 0, InetSocketAddress (destination, MYPROTOCOL_PORT));
+  //   NS_LOG_FUNCTION ("PeriodicUpdate Packet UID is : " << packet->GetUid ());
+  // }
 }
 
 // 周期发送控制包
@@ -676,8 +685,6 @@ RoutingProtocol::SetIpv4 (Ptr<Ipv4> ipv4)
   RoutingTableEntry rt (
     /* x */0, /* y */0, /* z */0, /* vx */0, /* vy */0, /* vz */0,
     /* timestamp */0, /* adress */Ipv4Address::GetLoopback ());
-  // rt.SetFlag (INVALID);
-  // rt.SetEntriesChanged (false);
   m_routingTable.AddRoute (rt); 
   Simulator::ScheduleNow (&RoutingProtocol::Start,this);
 }
