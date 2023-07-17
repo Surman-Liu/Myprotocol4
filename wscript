@@ -7,6 +7,7 @@ def build(bld):
         'model/myprotocol-rtable.cc',
         'model/myprotocol-packet.cc',
         'model/myprotocol-routing-protocol.cc',
+        'model/myprotocol-id-cache.cc',
         'helper/myprotocol-helper.cc',
         ]
 
@@ -21,6 +22,7 @@ def build(bld):
         'model/myprotocol-rtable.h',
         'model/myprotocol-packet.h',
         'model/myprotocol-routing-protocol.h',
+        'model/myprotocol-id-cache.h',
         'helper/myprotocol-helper.h',
         ]
     if (bld.env['ENABLE_EXAMPLES']):
