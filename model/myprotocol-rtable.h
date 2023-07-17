@@ -195,12 +195,6 @@ public:
    */
   void
   Print (Ptr<OutputStreamWrapper> stream) const;
-  /**
-   * Provides the number of routes present in that nodes routing table.
-   * \returns the number of routes
-   */
-  uint32_t
-  RoutingTableSize ();
 
   // ADD: 位置预测函数
   Vector PredictPosition(Ipv4Address id);

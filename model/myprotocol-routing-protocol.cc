@@ -227,11 +227,11 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p,
       dstPos.x = rt.GetX();
       dstPos.y = rt.GetY();
       dstPos.z = rt.GetZ();
-      Ipv4Address nexthop = m_routingTable.BestNeighbor(dstPos,myPos);
       dataHeader.SetDstPosx(rt.GetX());
       dataHeader.SetDstPosy(rt.GetY());
       dataHeader.SetDstPosz(rt.GetZ());
       dataHeader.SetTimestamp(rt.GetTimestamp());
+      Ipv4Address nexthop = m_routingTable.BestNeighbor(dstPos,myPos);
       // 数据包找到了合适的下一跳
       if(nexthop != Ipv4Address::GetZero ()){
         dataHeader.SetRecPosx(0);
@@ -251,7 +251,8 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p,
           }
         route->SetOutputDevice (m_ipv4->GetNetDevice (1));
         return route;
-      }else{
+      }
+      else{
         // 没有找到合适的下一跳,符合恢复转发的条件（有目的地位置，有可转发邻居）
         if(m_routingTable.MatchRecovery(dst,myPos)){
           dataHeader.SetRecPosx((uint16_t)myPos.x);
@@ -260,7 +261,7 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p,
           dataHeader.SetInRec(1);
           p->AddHeader(dataHeader);
           // 恢复模式获得下一跳
-          Ipv4Address nexthop = RecoveryMode (dst, p, header);
+          Ipv4Address nexthop = RecoveryMode (p, header);
           Ptr<Ipv4Route> route = Create<Ipv4Route> ();
           route->SetDestination (dst);
           route->SetGateway (nexthop);
@@ -315,6 +316,7 @@ RoutingProtocol::RouteInput (Ptr<const Packet> p,
     }
 
   // Deferred route request，收到回环的数据包
+  // todo:可以使用队列。
   if (EnableBuffering == true && idev == m_lo)
     {
       return false;
@@ -365,6 +367,12 @@ RoutingProtocol::RouteInput (Ptr<const Packet> p,
 bool 
 RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header, UnicastForwardCallback ucb, ErrorCallback ecb){
   Ptr<Packet> p = packet->Copy ();
+  // 先清除前面多余的8个字节，就可以获得正确的header
+  Ptr<Packet> prefix = p->CreateFragment(0,8);
+  p->RemoveAtStart(8);
+  DataHeader dataHeader;
+  p->RemoveHeader(dataHeader);
+
   Ipv4Address dst = header.GetDestination ();
   Ipv4Address origin = header.GetSource ();
 
@@ -372,23 +380,23 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
   Vector myPos = MM->GetPosition();
 
   Vector DstPosition;
+  uint16_t timestamp = 0;
   Vector RecPosition;
   uint16_t inRec = 0;
 
-  DataHeader dataHeader;
-  p->RemoveHeader(dataHeader);
+  DstPosition.x = dataHeader.GetDstPosx ();
+  DstPosition.y = dataHeader.GetDstPosy ();
+  DstPosition.z = dataHeader.GetDstPosz ();
+  timestamp = dataHeader.GetTimestamp();
   RecPosition.x = dataHeader.GetRecPosx ();
   RecPosition.y = dataHeader.GetRecPosy ();
   RecPosition.z = dataHeader.GetRecPosz ();
   inRec = dataHeader.GetInRec ();
-  DstPosition.x = dataHeader.GetDstPosx ();
-  DstPosition.y = dataHeader.GetDstPosy ();
-  DstPosition.z = dataHeader.GetDstPosz ();
 
   RoutingTableEntry rt;
   if(m_routingTable.LookupRoute(dst,rt)){
     // 更新目的地的最近地址
-    if(rt.GetTimestamp() > dataHeader.GetTimestamp ()){
+    if(rt.GetTimestamp() > timestamp){
       // 该节点的目的地地址更新
       dataHeader.SetDstPosx(rt.GetX());
       dataHeader.SetDstPosy(rt.GetY());
@@ -403,12 +411,17 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
   Ipv4Address nextHop;
   std::map<Ipv4Address, RoutingTableEntry> neighborTable;
   m_routingTable.LookupNeighbor(neighborTable, myPos);
-  std::map<Ipv4Address, RoutingTableEntry>::const_iterator i = neighborTable.find (dst);
-  // 不论是否使用贪婪，如果目的地就是我的邻居，可以认为变成使用贪婪，直接ucb转发。
-  if(i != neighborTable.end ())
+
+  // 如果邻居表不为空，才可以使用贪婪以及周边
+  if(!neighborTable.empty()){
+    std::map<Ipv4Address, RoutingTableEntry>::const_iterator i = neighborTable.find (dst);
+    // 不论是否使用贪婪，如果目的地就是我的邻居，可以认为变成使用贪婪，直接ucb转发。
+    if(i != neighborTable.end ())
     {
       nextHop = dst;
       p->AddHeader (dataHeader);
+      prefix->AddAtEnd(p);
+      p = prefix->Copy();
       Ptr<Ipv4Route> route = Create<Ipv4Route> ();
       route->SetDestination (dst);
       route->SetGateway (dst);
@@ -417,68 +430,78 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
       ucb (route, p, header);
       return true;
     }
-  
-  // 如果目的地不是自己的邻居，也不是自己，则需要切换到正确的转发模式进行转发
+    
+    // 如果目的地不是自己的邻居，也不是自己，则需要切换到正确的转发模式进行转发
 
-  // 收到恢复状态发过来的包，如果距离比RecPosition更近，则切换为贪婪状态。
-  if(inRec == 1 && CalculateDistance (myPos, DstPosition) < CalculateDistance (RecPosition, DstPosition)){
-    inRec = 0;
-    dataHeader.SetInRec(0);
-    NS_LOG_LOGIC ("No longer in Recovery to " << dst << " in " << myPos);
-  }
-  // 如果数据包本身就是恢复模式，并且该节点到目的地的距离比进入恢复模式到目的地的距离更远，则继续恢复模式
-  if(inRec == 1){
-    p->AddHeader (dataHeader);
-    // 恢复模式
-    nextHop = RecoveryMode (dst, p, header);
-    Ptr<Ipv4Route> route = Create<Ipv4Route> ();
-    route->SetDestination (dst);
-    route->SetSource (header.GetSource ());
-    route->SetGateway (nextHop);
-    route->SetOutputDevice (m_ipv4->GetNetDevice (1));  
-    return true;
-  }
-  if(inRec == 0){     //贪婪模式
-    // 使用贪婪来寻找邻居表中离目的地最近的下一跳。
-    // todo，这里应该自己传入目的地的坐标
-    nextHop = m_routingTable.BestNeighbor (DstPosition, myPos);
-    if (nextHop != Ipv4Address::GetZero ())
-    {
+    // 收到恢复状态发过来的包，如果距离比RecPosition更近，则切换为贪婪状态。
+    if(inRec == 1 && CalculateDistance (myPos, DstPosition) < CalculateDistance (RecPosition, DstPosition)){
+      inRec = 0;
       dataHeader.SetInRec(0);
-      p->AddHeader (dataHeader);          
-      Ptr<Ipv4Route> route = Create<Ipv4Route> ();
-      route->SetDestination (dst);
-      route->SetSource (header.GetSource ());
-      route->SetGateway (nextHop);
-      route->SetOutputDevice (m_ipv4->GetNetDevice (1));
-      NS_LOG_DEBUG ("Exist route to " << route->GetDestination () << " from interface " << route->GetOutputDevice ());                
-      NS_LOG_LOGIC (route->GetOutputDevice () << " forwarding to " << dst << " from " << origin << " through " << route->GetGateway () << " packet " << p->GetUid ());    
-      ucb (route, p, header);
-      return true;
-    }else{       // 如果贪婪转发没有找到合适的下一跳
-      inRec = 1;
-      dataHeader.SetInRec(1);
-      dataHeader.SetRecPosx ((uint16_t)myPos.x);
-      dataHeader.SetRecPosy ((uint16_t)myPos.y); 
-      dataHeader.SetRecPosz ((uint16_t)myPos.z);
+      NS_LOG_LOGIC ("No longer in Recovery to " << dst << " in " << myPos);
+    }
+    // 如果数据包本身就是恢复模式，并且该节点到目的地的距离比进入恢复模式到目的地的距离更远，则继续恢复模式
+    if(inRec == 1){
       p->AddHeader (dataHeader);
+      prefix->AddAtEnd(p);
+      p = prefix->Copy();
       // 恢复模式
-      nextHop = RecoveryMode (dst, p, header);
+      nextHop = RecoveryMode (p, header);
       Ptr<Ipv4Route> route = Create<Ipv4Route> ();
       route->SetDestination (dst);
       route->SetSource (header.GetSource ());
       route->SetGateway (nextHop);
       route->SetOutputDevice (m_ipv4->GetNetDevice (1));  
       return true;
+      // return false;
+    }
+    if(inRec == 0){     //贪婪模式
+      // 使用贪婪来寻找邻居表中离目的地最近的下一跳。
+      // todo，这里应该自己传入目的地的坐标
+      nextHop = m_routingTable.BestNeighbor (DstPosition, myPos);
+      if (nextHop != Ipv4Address::GetZero ())
+      {
+        dataHeader.SetInRec(0);
+        p->AddHeader (dataHeader);    
+        prefix->AddAtEnd(p);
+        p = prefix->Copy();      
+        Ptr<Ipv4Route> route = Create<Ipv4Route> ();
+        route->SetDestination (dst);
+        route->SetSource (header.GetSource ());
+        route->SetGateway (nextHop);
+        route->SetOutputDevice (m_ipv4->GetNetDevice (1));
+        NS_LOG_DEBUG ("Exist route to " << route->GetDestination () << " from interface " << route->GetOutputDevice ());                
+        NS_LOG_LOGIC (route->GetOutputDevice () << " forwarding to " << dst << " from " << origin << " through " << route->GetGateway () << " packet " << p->GetUid ());    
+        ucb (route, p, header);
+        return true;
+      }else{       // 如果贪婪转发没有找到合适的下一跳
+        inRec = 1;
+        dataHeader.SetInRec(1);
+        dataHeader.SetRecPosx ((uint16_t)myPos.x);
+        dataHeader.SetRecPosy ((uint16_t)myPos.y); 
+        dataHeader.SetRecPosz ((uint16_t)myPos.z);
+        p->AddHeader (dataHeader);
+        prefix->AddAtEnd(p);
+        p = prefix->Copy();
+        // 恢复模式
+        nextHop = RecoveryMode (p, header);
+        Ptr<Ipv4Route> route = Create<Ipv4Route> ();
+        route->SetDestination (dst);
+        route->SetSource (header.GetSource ());
+        route->SetGateway (nextHop);
+        route->SetOutputDevice (m_ipv4->GetNetDevice (1));  
+        return true;
+        // return false;
+      }
     }
   }
 
+  // todo:可以使用队列。邻居表为空
   return false;
 }
 
 // ADD：贪婪转发
 Ipv4Address 
-RoutingProtocol::RecoveryMode(Ipv4Address dst, Ptr<Packet> p, Ipv4Header header){
+RoutingProtocol::RecoveryMode(Ptr<Packet> p, Ipv4Header header){
   Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
   Vector myPos = MM->GetPosition();
   std::map<Ipv4Address, RoutingTableEntry> neighborTable;
@@ -642,7 +665,6 @@ RoutingProtocol::SendPeriodicUpdate ()
   myprotocolHeader.SetSign(sign);
   myprotocolHeader.SetTimestamp(Simulator::Now ().ToInteger(Time::S));
   myprotocolHeader.SetMyadress(m_ipv4->GetAddress (1, 0).GetLocal ());
-  // std::cout<<"send timestamp = "<<Simulator::Now ().ToInteger(Time::S)<<"; myadress = "<<m_ipv4->GetAddress (1, 0).GetLocal ()<<"\n";
 
   Ptr<Packet> packet = Create<Packet> ();
   packet->AddHeader (myprotocolHeader);

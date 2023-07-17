@@ -94,12 +94,6 @@ RoutingTable::DeleteRoute (Ipv4Address dst)
   return false;
 }
 
-uint32_t
-RoutingTable::RoutingTableSize ()
-{
-  return m_positionTable.size ();
-}
-
 bool
 RoutingTable::AddRoute (RoutingTableEntry & rt)
 {
@@ -220,7 +214,6 @@ RoutingTable::BestNeighbor (Vector dstPos, Vector myPos)
     return bestFoundID;
   }else{
     std::cout<<"There is no closer neighbor!!!\n";
-    std::cout<<"zero = "<<Ipv4Address::GetZero ()<<"\n";
     return Ipv4Address::GetZero (); //so it enters Recovery-mode
   }
 }

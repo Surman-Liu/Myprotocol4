@@ -246,7 +246,7 @@ private:
   bool Forwarding (Ptr<const Packet> p, const Ipv4Header & header, UnicastForwardCallback ucb, ErrorCallback ecb);
 
   // ADD:恢复模式
-  Ipv4Address RecoveryMode(Ipv4Address dst, Ptr<Packet> p, Ipv4Header header);
+  Ipv4Address RecoveryMode(Ptr<Packet> p, Ipv4Header header);
 
   /// Timer to trigger periodic updates from a node
   Timer m_periodicUpdateTimer;
