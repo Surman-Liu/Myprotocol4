@@ -41,6 +41,8 @@
 #include "ns3/uinteger.h"
 #include "ns3/random-variable-stream.h"
 #include "ns3/rng-seed-manager.h"
+#include "ns3/icmpv4.h"
+#include "ns3/udp-header.h"
 
 namespace ns3 {
 
@@ -138,8 +140,14 @@ RoutingProtocol::AssignStreams (int64_t stream)
   return 1;
 }
 
+// ADD：在此处初始化与id-cache相关的变量
 RoutingProtocol::RoutingProtocol ()
   : m_routingTable (),
+    m_netDiameter (15),                                    //最大跳数，1000*根号二/250m = 6hops
+    m_nodeTraversalTime (MilliSeconds (40)),               //一跳的传播速度，250m / 299792458m/s = 
+    m_netTraversalTime (Time ((2 * m_netDiameter) * m_nodeTraversalTime)),
+    m_pathDiscoveryTime ( Time (2 * m_netTraversalTime)),
+    m_idCache(m_pathDiscoveryTime),            // 每个生命周期是2.4s
     m_periodicUpdateTimer (Timer::CANCEL_ON_DESTROY)
 {
   m_uniformRandomVariable = CreateObject<UniformRandomVariable> ();
@@ -300,6 +308,7 @@ RoutingProtocol::RouteInput (Ptr<const Packet> p,
       NS_LOG_DEBUG ("No myprotocol interfaces");
       return false;
     }
+
   NS_ASSERT (m_ipv4 != 0);
   // Check if input device supports IP
   NS_ASSERT (m_ipv4->GetInterfaceForDevice (idev) >= 0);
@@ -331,6 +340,50 @@ RoutingProtocol::RouteInput (Ptr<const Packet> p,
           return true;
         }
     }
+
+  // LOCAL DELIVARY TO DSDV INTERFACES
+  for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j
+       != m_socketAddresses.end (); ++j)
+  {
+    Ipv4InterfaceAddress iface = j->second;
+    if (m_ipv4->GetInterfaceForAddress (iface.GetLocal ()) == iif)
+      {
+        if (dst == iface.GetBroadcast () || dst.IsBroadcast ())
+          {
+            Ptr<Packet> packet = p->Copy ();
+            if (lcb.IsNull () == false)
+              {
+                NS_LOG_LOGIC ("Broadcast local delivery to " << iface.GetLocal ());
+                lcb (p, header, iif);
+                // Fall through to additional processing
+              }
+            else
+              {
+                NS_LOG_ERROR ("Unable to deliver packet locally due to null callback " << p->GetUid () << " from " << origin);
+                ecb (p, header, Socket::ERROR_NOROUTETOHOST);
+              }
+            if (header.GetTtl () > 1)
+              {
+                NS_LOG_LOGIC ("Forward broadcast. TTL " << (uint16_t) header.GetTtl ());
+                RoutingTableEntry toBroadcast;
+                if (m_routingTable.LookupRoute (dst,toBroadcast))
+                  {
+                    Ptr<Ipv4Route> route = Create<Ipv4Route> ();
+                    route->SetDestination(m_ipv4->GetAddress (1, 0).GetBroadcast ());
+                    route->SetGateway(m_ipv4->GetAddress (1, 0).GetBroadcast ());
+                    route->SetSource(m_ipv4->GetAddress (1, 0).GetLocal ());
+                    route->SetOutputDevice(m_ipv4->GetNetDevice (1));
+                    ucb (route,packet,header);
+                  }
+                else
+                  {
+                    NS_LOG_DEBUG ("No route to forward. Drop packet " << p->GetUid ());
+                  }
+              }
+            return true;
+          }
+      }
+  }
 
   // 自己就是数据包的目的地，则只需要本地转发
   if (m_ipv4->IsDestinationAddress (dst, iif))
@@ -366,10 +419,27 @@ RoutingProtocol::RouteInput (Ptr<const Packet> p,
 /// ADD：If route exists and valid, forward packet.
 bool 
 RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header, UnicastForwardCallback ucb, ErrorCallback ecb){
+  PacketMetadata::ItemIterator i = packet->BeginItem();
+  PacketMetadata::Item item = i.Next ();
+  TypeId id = item.tid;
   Ptr<Packet> p = packet->Copy ();
-  // 先清除前面多余的8个字节，就可以获得正确的header
-  Ptr<Packet> prefix = p->CreateFragment(0,8);
-  p->RemoveAtStart(8);
+  Icmpv4Header icmpv4Header;
+  UdpHeader udpHeader;
+
+  // std::cout<<"packet-size = "<<p->GetSize()<<"\nheader = "<<header<<"\npacket = "<<p->ToString()<<"\n\n\n";  
+  
+  // icmpv4的包
+  if(id == icmpv4Header.GetTypeId()){
+    std::cout<<"this is not udp packet!!!\n";
+    NS_LOG_DEBUG ("this is not udp packet!!!");
+    // 清除icmpv4的包头
+    p->RemoveHeader(icmpv4Header);
+  }else{
+    // 清除udpheader的包头
+    // 先清除前面多余的8个字节，就可以获得正确的header
+    p->RemoveHeader(udpHeader);
+  }
+  
   DataHeader dataHeader;
   p->RemoveHeader(dataHeader);
 
@@ -420,8 +490,11 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
     {
       nextHop = dst;
       p->AddHeader (dataHeader);
-      prefix->AddAtEnd(p);
-      p = prefix->Copy();
+      if(id == icmpv4Header.GetTypeId()){
+        p->AddHeader(icmpv4Header);
+      }else{
+        p->AddHeader(udpHeader);
+      }
       Ptr<Ipv4Route> route = Create<Ipv4Route> ();
       route->SetDestination (dst);
       route->SetGateway (dst);
@@ -442,8 +515,11 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
     // 如果数据包本身就是恢复模式，并且该节点到目的地的距离比进入恢复模式到目的地的距离更远，则继续恢复模式
     if(inRec == 1){
       p->AddHeader (dataHeader);
-      prefix->AddAtEnd(p);
-      p = prefix->Copy();
+      if(id == icmpv4Header.GetTypeId()){
+        p->AddHeader(icmpv4Header);
+      }else{
+        p->AddHeader(udpHeader);
+      }
       // 恢复模式
       nextHop = RecoveryMode (p, header);
       Ptr<Ipv4Route> route = Create<Ipv4Route> ();
@@ -461,9 +537,12 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
       if (nextHop != Ipv4Address::GetZero ())
       {
         dataHeader.SetInRec(0);
-        p->AddHeader (dataHeader);    
-        prefix->AddAtEnd(p);
-        p = prefix->Copy();      
+        p->AddHeader (dataHeader);  
+        if(id == icmpv4Header.GetTypeId()){
+          p->AddHeader(icmpv4Header);
+        }else{
+          p->AddHeader(udpHeader);
+        }        
         Ptr<Ipv4Route> route = Create<Ipv4Route> ();
         route->SetDestination (dst);
         route->SetSource (header.GetSource ());
@@ -480,8 +559,11 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
         dataHeader.SetRecPosy ((uint16_t)myPos.y); 
         dataHeader.SetRecPosz ((uint16_t)myPos.z);
         p->AddHeader (dataHeader);
-        prefix->AddAtEnd(p);
-        p = prefix->Copy();
+        if(id == icmpv4Header.GetTypeId()){
+          p->AddHeader(icmpv4Header);
+        }else{
+          p->AddHeader(udpHeader);
+        }
         // 恢复模式
         nextHop = RecoveryMode (p, header);
         Ptr<Ipv4Route> route = Create<Ipv4Route> ();
@@ -489,6 +571,7 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
         route->SetSource (header.GetSource ());
         route->SetGateway (nextHop);
         route->SetOutputDevice (m_ipv4->GetNetDevice (1));  
+        ucb (route, p, header);
         return true;
         // return false;
       }
@@ -576,6 +659,9 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
   // RecvFrom中参数的类型是Address
   Ptr<Packet> packet = socket->RecvFrom (sourceAddress);
 
+  // std::cout<<"packet-size = "<<packet->GetSize()<<"\npacket = "<<packet->ToString()<<"\n\n\n";  
+
+
   //更新邻居表，以便打印路由 
   Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
   Vector myPos = MM->GetPosition();
@@ -584,7 +670,16 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
 
   MyprotocolHeader myprotocolHeader;
   packet->RemoveHeader (myprotocolHeader);
+
   Ipv4Address source = myprotocolHeader.GetMyadress();         //是哪个节点的位置信息
+
+  // ADD:检查是否已经转发过，如果是则丢弃。
+  if (m_idCache.IsDuplicate (source, myprotocolHeader.GetTimestamp()))
+  {
+    NS_LOG_DEBUG ("Ignoring RREQ due to duplicate");
+    return;
+  }
+
   // 获取带符号的速度信息
   Vector velocity = GetRightVelocity(myprotocolHeader.GetVx(), myprotocolHeader.GetVy(), myprotocolHeader.GetVz(), myprotocolHeader.GetSign());
   RoutingTableEntry rt;
@@ -614,28 +709,27 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
       m_routingTable.Update(rt);
     }
   }
-
-  // for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j
-  //      != m_socketAddresses.end (); ++j)
-  // {
-  //   Ptr<Socket> socket = j->first;
-  //   Ipv4InterfaceAddress iface = j->second;
-  //   packet->AddHeader(myprotocolHeader);
-  //   // question：这个send函数在这里有什么用？？？
-  //   socket->Send (packet);
-  //   // Send to all-hosts broadcast if on /32 addr, subnet-directed otherwise
-  //   Ipv4Address destination;
-  //   if (iface.GetMask () == Ipv4Mask::GetOnes ())
-  //     {
-  //       destination = Ipv4Address ("255.255.255.255");
-  //     }
-  //   else
-  //     {
-  //       destination = iface.GetBroadcast ();
-  //     }
-  //   socket->SendTo (packet, 0, InetSocketAddress (destination, MYPROTOCOL_PORT));
-  //   NS_LOG_FUNCTION ("PeriodicUpdate Packet UID is : " << packet->GetUid ());
-  // }
+  
+  packet->AddHeader(myprotocolHeader);
+  for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j
+       != m_socketAddresses.end (); ++j)
+  {
+    Ptr<Socket> socket = j->first;
+    Ipv4InterfaceAddress iface = j->second;
+    // question：这个send函数在这里有什么用？？？
+    socket->Send (packet);
+    // Send to all-hosts broadcast if on /32 addr, subnet-directed otherwise
+    Ipv4Address destination;
+    if (iface.GetMask () == Ipv4Mask::GetOnes ())
+      {
+        destination = Ipv4Address ("255.255.255.255");
+      }
+    else
+      {
+        destination = iface.GetBroadcast ();
+      }
+    socket->SendTo (packet, 0, InetSocketAddress (destination, MYPROTOCOL_PORT));
+  }
 }
 
 // 周期发送控制包
@@ -674,6 +768,10 @@ RoutingProtocol::SendPeriodicUpdate ()
     {
       Ptr<Socket> socket = j->first;
       Ipv4InterfaceAddress iface = j->second;
+
+      // ADD:在id-cache中添加这个控制包
+      m_idCache.IsDuplicate (m_ipv4->GetAddress (1, 0).GetLocal (), myprotocolHeader.GetTimestamp());
+
       // question：这个send函数在这里有什么用？？？
       socket->Send (packet);
       // Send to all-hosts broadcast if on /32 addr, subnet-directed otherwise

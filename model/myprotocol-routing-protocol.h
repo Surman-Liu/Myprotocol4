@@ -35,6 +35,7 @@
 
 #include "myprotocol-rtable.h"
 #include "myprotocol-packet.h"
+#include "myprotocol-id-cache.h"
 #include "ns3/node.h"
 #include "ns3/random-variable-stream.h"
 #include "ns3/ipv4-routing-protocol.h"
@@ -121,6 +122,19 @@ private:
   UnicastForwardCallback m_scb;
   /// Error callback for own packets
   ErrorCallback m_ecb;
+
+  // ADD：初始化id-cache需要的相关时间变量
+  uint32_t m_netDiameter;             ///< Net diameter measures the maximum possible number of hops between two nodes in the network
+  /**
+   *  NodeTraversalTime is a conservative estimate of the average one hop traversal time for packets
+   *  and should include queuing delays, interrupt processing times and transfer times.
+   */
+  Time m_nodeTraversalTime;
+  Time m_netTraversalTime;             ///< Estimate of the average net traversal time.
+  Time m_pathDiscoveryTime;            ///< Estimate of maximum time needed to find route in network.
+
+  // ADD:id-cache
+  IdCache m_idCache;
 
 private:
   /// Start protocol operation
