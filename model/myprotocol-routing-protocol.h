@@ -44,9 +44,18 @@
 #include "ns3/output-stream-wrapper.h"
 // 添加移动模型
 #include "ns3/mobility-model.h"
+#include<cmath>
 
 namespace ns3 {
 namespace myprotocol {
+
+// ADD:无人机运动的信息
+struct Information
+{
+  float speed;
+  float thetaXY;
+  float thetaZ;
+};
 
 /**
  * \ingroup myprotocol
@@ -68,6 +77,14 @@ public:
   ~RoutingProtocol ();
   virtual void
   DoDispose ();
+
+  // ADD：
+  void SetEnableAdaptiveUpdate (bool f){
+    m_enableAdaptiveUpdate = f;
+  }
+  bool GetEnableAdaptiveUpdate () const{
+    return m_enableAdaptiveUpdate;
+  }
 
   // From Ipv4RoutingProtocol
   Ptr<Ipv4Route> RouteOutput (Ptr<Packet> p, const Ipv4Header &header, Ptr<NetDevice> oif, Socket::SocketErrno &sockerr);
@@ -106,6 +123,12 @@ private:
   /// PeriodicUpdateInterval specifies the periodic time interval between which the a node broadcasts
   /// its entire routing table.
   Time m_periodicUpdateInterval;
+
+  // ADD:是否启用自适应更新
+  bool m_enableAdaptiveUpdate;
+  // ADD: 检查改变的时间周期  
+  Time m_checkChangeInterval;   //检查改变的时间周期  
+
   /// Nodes IP address
   Ipv4Address m_mainAddress;
   /// IP protocol
@@ -123,6 +146,11 @@ private:
   /// Error callback for own packets
   ErrorCallback m_ecb;
 
+  // ADD：记录上次控制包中的方向和速度
+  struct Information m_information;
+  uint16_t m_thetaThreshold;    //方向改变阈值
+  uint16_t m_speedThreshold;    //速度改变阈值
+
   // ADD：初始化id-cache需要的相关时间变量
   uint32_t m_netDiameter;             ///< Net diameter measures the maximum possible number of hops between two nodes in the network
   /**
@@ -132,6 +160,8 @@ private:
   Time m_nodeTraversalTime;
   Time m_netTraversalTime;             ///< Estimate of the average net traversal time.
   Time m_pathDiscoveryTime;            ///< Estimate of maximum time needed to find route in network.
+
+  uint16_t m_lastSendTime;
 
   // ADD:id-cache
   IdCache m_idCache;
@@ -196,6 +226,13 @@ private:
   void
   Drop (Ptr<const Packet>, const Ipv4Header &, Socket::SocketErrno);
 
+  // ADD:定期检查速度、方向的变化
+  void
+  CheckChange ();
+
+  // ADD: 计算运动信息
+  void
+  CalculateInformation (struct Information &information);
 
   // ADD:转换速度符号的两个函数。sign：记录速度是否为负数，0:都不是负数，1:X轴速度为负，2:Y轴速度为负，3:Z轴速度为负,4：xy为负数，5：xz为负数，6：yz为负数，7：全部都是负数
   Vector GetRightVelocity(uint16_t vx, uint16_t vy, uint16_t vz, uint16_t sign){
@@ -264,6 +301,9 @@ private:
 
   /// Timer to trigger periodic updates from a node
   Timer m_periodicUpdateTimer;
+
+  // ADD:定时检查速度方向变化的计时器
+  Timer m_checkChangeTimer;
 
   /// Provides uniform random variables.
   Ptr<UniformRandomVariable> m_uniformRandomVariable;
