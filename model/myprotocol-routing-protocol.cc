@@ -134,7 +134,7 @@ RoutingProtocol::GetTypeId (void)
                    MakeTimeAccessor (&RoutingProtocol::m_checkChangeInterval),
                    MakeTimeChecker ())
     .AddAttribute ("EnableAdaptiveUpdate","Enables adaptive update node information. ",
-                   BooleanValue (true),
+                   BooleanValue (false),
                    MakeBooleanAccessor (&RoutingProtocol::SetEnableAdaptiveUpdate,
                                         &RoutingProtocol::GetEnableAdaptiveUpdate),
                    MakeBooleanChecker ());            
@@ -220,8 +220,6 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p,
                               Socket::SocketErrno &sockerr)
 {
   NS_LOG_FUNCTION (this << header << (oif ? oif->GetIfIndex () : 0));
-
-  std::cout<<"1111111111111111-packet-size = "<<p->GetSize()<<"\nheader = "<<header<<"\npacket = "<<p->ToString()<<"\n\n\n";  
 
   if (!p)
     {
@@ -322,9 +320,6 @@ RoutingProtocol::RouteInput (Ptr<const Packet> p,
                              LocalDeliverCallback lcb,
                              ErrorCallback ecb)
 {  
-
-  std::cout<<"2222222222222-packet-size = "<<p->GetSize()<<"\nheader = "<<header<<"\npacket = "<<p->ToString()<<"\n\n\n";  
-
   NS_LOG_FUNCTION (m_mainAddress << " received packet " << p->GetUid ()
                                  << " from " << header.GetSource ()
                                  << " on interface " << idev->GetAddress ()
@@ -684,8 +679,6 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
   // RecvFrom中参数的类型是Address
   Ptr<Packet> packet = socket->RecvFrom (sourceAddress);
 
-  // std::cout<<"33333333333333-packet-size = "<<packet->GetSize()<<"\npacket = "<<packet->ToString()<<"\n\n\n"; 
-
   //更新邻居表，以便打印路由 
   Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
   Vector myPos = MM->GetPosition();
@@ -814,7 +807,6 @@ RoutingProtocol::CheckChange ()
   struct Information information;
   // 计算当前信息
   CalculateInformation(information);
-  // std::cout<<"speed = "<<m_information.speed<<", thetaXY = "<<m_information.thetaXY<<", thetaZ = "<<m_information.thetaZ<<"\n";
   // 计算差值
   float deltaSpeed = fabs(information.speed - m_information.speed);
   float deltaThetaXY = fabs(information.thetaXY - m_information.thetaXY);
@@ -865,10 +857,6 @@ RoutingProtocol::SendPeriodicUpdate ()
 
   Ptr<Packet> packet = Create<Packet> ();
   packet->AddHeader (myprotocolHeader);
-
-  // std::cout<<"packet = "<<packet->ToString()<<"\n\n";
-
-  // std::cout<<"444444444444444444-packet-size = "<<packet->GetSize()<<"\npacket = "<<packet->ToString()<<"\n\n\n"; 
 
   for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j
        != m_socketAddresses.end (); ++j)

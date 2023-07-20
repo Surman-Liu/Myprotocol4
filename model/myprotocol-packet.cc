@@ -82,14 +82,14 @@ void
 MyprotocolHeader::Serialize (Buffer::Iterator i) const
 {
   // ADD: 序列化位置信息
-  i.WriteU16 (m_x);
-  i.WriteU16 (m_y);
-  i.WriteU16 (m_z);
-  i.WriteU16 (m_vx);
-  i.WriteU16 (m_vy);
-  i.WriteU16 (m_vz);
-  i.WriteU16(m_sign);
-  i.WriteU16 (m_timestamp);
+  i.WriteHtonU16 (m_x);
+  i.WriteHtonU16 (m_y);
+  i.WriteHtonU16 (m_z);
+  i.WriteHtonU16 (m_vx);
+  i.WriteHtonU16 (m_vy);
+  i.WriteHtonU16 (m_vz);
+  i.WriteHtonU16(m_sign);
+  i.WriteHtonU16 (m_timestamp);
   WriteTo (i, m_myadress);
 }
 
@@ -98,14 +98,14 @@ MyprotocolHeader::Deserialize (Buffer::Iterator start)
 {
   Buffer::Iterator i = start;
   //ADD: 反序列化位置信息
-  m_x = i.ReadU16 ();
-  m_y = i.ReadU16 ();
-  m_z = i.ReadU16 ();
-  m_vx = i.ReadU16 ();
-  m_vy = i.ReadU16 ();
-  m_vz = i.ReadU16 ();
-  m_sign = i.ReadU16();
-  m_timestamp = i.ReadU16 ();
+  m_x = i.ReadNtohU16 ();
+  m_y = i.ReadNtohU16 ();
+  m_z = i.ReadNtohU16 ();
+  m_vx = i.ReadNtohU16 ();
+  m_vy = i.ReadNtohU16 ();
+  m_vz = i.ReadNtohU16 ();
+  m_sign = i.ReadNtohU16();
+  m_timestamp = i.ReadNtohU16 ();
   ReadFrom (i, m_myadress);
 
   uint32_t dist = i.GetDistanceFrom (start);
@@ -171,28 +171,28 @@ DataHeader::GetSerializedSize () const
 void
 DataHeader::Serialize (Buffer::Iterator i) const
 {
-  i.WriteU16 (m_dstPosx);
-  i.WriteU16 (m_dstPosy);
-  i.WriteU16 (m_dstPosz);
-  i.WriteU16 (m_timestamp);
-  i.WriteU16 (m_recPosx);
-  i.WriteU16 (m_recPosy);
-  i.WriteU16 (m_recPosz);
-  i.WriteU16 (m_inRec);
+  i.WriteHtonU16 (m_dstPosx);
+  i.WriteHtonU16 (m_dstPosy);
+  i.WriteHtonU16 (m_dstPosz);
+  i.WriteHtonU16 (m_timestamp);
+  i.WriteHtonU16 (m_recPosx);
+  i.WriteHtonU16 (m_recPosy);
+  i.WriteHtonU16 (m_recPosz);
+  i.WriteHtonU16 (m_inRec);
 }
 
 uint32_t
 DataHeader::Deserialize (Buffer::Iterator start)
 {
   Buffer::Iterator i = start;
-  m_dstPosx = i.ReadU16 ();
-  m_dstPosy = i.ReadU16 ();
-  m_dstPosz = i.ReadU16 ();
-  m_timestamp = i.ReadU16 ();
-  m_recPosx = i.ReadU16 ();
-  m_recPosy = i.ReadU16 ();
-  m_recPosz = i.ReadU16 ();
-  m_inRec = i.ReadU16 ();
+  m_dstPosx = i.ReadNtohU16 ();
+  m_dstPosy = i.ReadNtohU16 ();
+  m_dstPosz = i.ReadNtohU16 ();
+  m_timestamp = i.ReadNtohU16 ();
+  m_recPosx = i.ReadNtohU16 ();
+  m_recPosy = i.ReadNtohU16 ();
+  m_recPosz = i.ReadNtohU16 ();
+  m_inRec = i.ReadNtohU16 ();
 
   uint32_t dist = i.GetDistanceFrom (start);
   NS_ASSERT (dist == GetSerializedSize ());
