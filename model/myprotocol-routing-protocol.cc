@@ -128,7 +128,16 @@ RoutingProtocol::GetTypeId (void)
     .AddAttribute ("PeriodicUpdateInterval","Periodic interval between exchange of full routing tables among nodes. ",
                    TimeValue (Seconds (10)),
                    MakeTimeAccessor (&RoutingProtocol::m_periodicUpdateInterval),
-                   MakeTimeChecker ());
+                   MakeTimeChecker ())
+    .AddAttribute ("CheckChangeInterval","Check interval between compare speed and thata with thire threshold. ",
+                   TimeValue (Seconds (1)),
+                   MakeTimeAccessor (&RoutingProtocol::m_checkChangeInterval),
+                   MakeTimeChecker ())
+    .AddAttribute ("EnableAdaptiveUpdate","Enables adaptive update node information. ",
+                   BooleanValue (true),
+                   MakeBooleanAccessor (&RoutingProtocol::SetEnableAdaptiveUpdate,
+                                        &RoutingProtocol::GetEnableAdaptiveUpdate),
+                   MakeBooleanChecker ());            
   return tid;
 }
 
@@ -143,13 +152,20 @@ RoutingProtocol::AssignStreams (int64_t stream)
 // ADD：在此处初始化与id-cache相关的变量
 RoutingProtocol::RoutingProtocol ()
   : m_routingTable (),
+    m_thetaThreshold(5),
+    m_speedThreshold(5),
     m_netDiameter (15),                                    //最大跳数，1000*根号二/250m = 6hops
     m_nodeTraversalTime (MilliSeconds (40)),               //一跳的传播速度，250m / 299792458m/s = 
     m_netTraversalTime (Time ((2 * m_netDiameter) * m_nodeTraversalTime)),
     m_pathDiscoveryTime ( Time (2 * m_netTraversalTime)),
+    m_lastSendTime(0),
     m_idCache(m_pathDiscoveryTime),            // 每个生命周期是2.4s
-    m_periodicUpdateTimer (Timer::CANCEL_ON_DESTROY)
+    m_periodicUpdateTimer (Timer::CANCEL_ON_DESTROY),
+    m_checkChangeTimer(Timer::CANCEL_ON_DESTROY)
 {
+  m_information.speed = 0;
+  m_information.thetaXY = 0;
+  m_information.thetaZ = 0;
   m_uniformRandomVariable = CreateObject<UniformRandomVariable> ();
 }
 
@@ -187,8 +203,13 @@ RoutingProtocol::Start ()
 {
   m_scb = MakeCallback (&RoutingProtocol::Send,this);
   m_ecb = MakeCallback (&RoutingProtocol::Drop,this);
-  m_periodicUpdateTimer.SetFunction (&RoutingProtocol::SendPeriodicUpdate,this);
-  m_periodicUpdateTimer.Schedule (MicroSeconds (m_uniformRandomVariable->GetInteger (0,1000)));
+  if(!m_enableAdaptiveUpdate){
+    m_periodicUpdateTimer.SetFunction (&RoutingProtocol::SendPeriodicUpdate,this);
+    m_periodicUpdateTimer.Schedule (MicroSeconds (m_uniformRandomVariable->GetInteger (0,1000)));
+  }else{
+    m_checkChangeTimer.SetFunction (&RoutingProtocol::CheckChange,this);
+    m_checkChangeTimer.Schedule (MicroSeconds (m_uniformRandomVariable->GetInteger (0,1000)));
+  }
 }
 
 // 既可以转发控制包，也可以转发数据包，但是都是自己发出的
@@ -199,6 +220,8 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p,
                               Socket::SocketErrno &sockerr)
 {
   NS_LOG_FUNCTION (this << header << (oif ? oif->GetIfIndex () : 0));
+
+  std::cout<<"1111111111111111-packet-size = "<<p->GetSize()<<"\nheader = "<<header<<"\npacket = "<<p->ToString()<<"\n\n\n";  
 
   if (!p)
     {
@@ -299,6 +322,9 @@ RoutingProtocol::RouteInput (Ptr<const Packet> p,
                              LocalDeliverCallback lcb,
                              ErrorCallback ecb)
 {  
+
+  std::cout<<"2222222222222-packet-size = "<<p->GetSize()<<"\nheader = "<<header<<"\npacket = "<<p->ToString()<<"\n\n\n";  
+
   NS_LOG_FUNCTION (m_mainAddress << " received packet " << p->GetUid ()
                                  << " from " << header.GetSource ()
                                  << " on interface " << idev->GetAddress ()
@@ -425,8 +451,6 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
   Ptr<Packet> p = packet->Copy ();
   Icmpv4Header icmpv4Header;
   UdpHeader udpHeader;
-
-  // std::cout<<"packet-size = "<<p->GetSize()<<"\nheader = "<<header<<"\npacket = "<<p->ToString()<<"\n\n\n";  
   
   // icmpv4的包
   if(id == icmpv4Header.GetTypeId()){
@@ -526,7 +550,8 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
       route->SetDestination (dst);
       route->SetSource (header.GetSource ());
       route->SetGateway (nextHop);
-      route->SetOutputDevice (m_ipv4->GetNetDevice (1));  
+      route->SetOutputDevice (m_ipv4->GetNetDevice (1)); 
+      ucb (route, p, header); 
       return true;
       // return false;
     }
@@ -659,8 +684,7 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
   // RecvFrom中参数的类型是Address
   Ptr<Packet> packet = socket->RecvFrom (sourceAddress);
 
-  // std::cout<<"packet-size = "<<packet->GetSize()<<"\npacket = "<<packet->ToString()<<"\n\n\n";  
-
+  // std::cout<<"33333333333333-packet-size = "<<packet->GetSize()<<"\npacket = "<<packet->ToString()<<"\n\n\n"; 
 
   //更新邻居表，以便打印路由 
   Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
@@ -732,10 +756,86 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
   }
 }
 
+// ADD: 计算运动信息
+void
+RoutingProtocol::CalculateInformation (struct Information &information){
+  Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
+  // Vector myPos = MM->GetPosition();
+  Vector myVel = MM->GetVelocity();
+  int16_t vx = (int16_t)myVel.x;
+  int16_t vy = (int16_t)myVel.y;
+  int16_t vz = (int16_t)myVel.z;
+
+  // speed
+  information.speed = sqrt(vx*vx + vy*vy + vz*vz);
+  // thetaXY，[0,2π]
+  if(vx == 0){
+    if(vy == 0){
+      information.thetaXY = 0;
+    }else if(vy > 0){
+      information.thetaXY = M_PI / 2;
+    }else{
+      information.thetaXY = M_PI * 3 / 2;
+    }
+  }else if(vx > 0){
+    if(vy == 0){
+      information.thetaXY = 0;
+    }else if(vy > 0){
+      information.thetaXY = atan(vy / vx);
+    }else{
+      information.thetaXY = 2 * M_PI + atan(vy / vx);
+    }
+  }else{
+    if(vy == 0){
+      information.thetaXY = M_PI;
+    }else{
+      information.thetaXY = M_PI + atan(vy / vx);
+    }
+  }
+  // thetaZ，[π/2,-π/2]
+  float vxy = sqrt(vx*vx + vy*vy);
+  if(vxy == 0){
+    if(vz > 0){
+      information.thetaZ = M_PI / 2;
+    }else if(vz < 0){
+      information.thetaZ = - M_PI / 2;
+    }else{
+      information.thetaZ = 0;
+    }
+  }else{
+    information.thetaZ = atan(vz / vxy);
+  }
+}
+
+// ADD：定期检查速度、方向变化
+void
+RoutingProtocol::CheckChange ()
+{
+  struct Information information;
+  // 计算当前信息
+  CalculateInformation(information);
+  // std::cout<<"speed = "<<m_information.speed<<", thetaXY = "<<m_information.thetaXY<<", thetaZ = "<<m_information.thetaZ<<"\n";
+  // 计算差值
+  float deltaSpeed = fabs(information.speed - m_information.speed);
+  float deltaThetaXY = fabs(information.thetaXY - m_information.thetaXY);
+  float deltaThetaZ = fabs(information.thetaZ - m_information.thetaZ);
+  // 将角度阈值变成弧度
+  float thetaThreshold = m_thetaThreshold * M_PI / 180;
+  // 变化超出阈值，重新发送更新控制包
+  if(deltaSpeed > m_speedThreshold || deltaThetaXY > thetaThreshold || deltaThetaZ > thetaThreshold){
+    SendPeriodicUpdate();
+  }
+  // 开启定时器
+  m_checkChangeTimer.Schedule (m_checkChangeInterval + MicroSeconds (25 * m_uniformRandomVariable->GetInteger (0,1000)));
+}
+
 // 周期发送控制包
 void
 RoutingProtocol::SendPeriodicUpdate ()
-{
+{ 
+  std::cout<<"send time interval = "<<Simulator::Now ().ToInteger(Time::S) - m_lastSendTime<<"\n";
+  m_lastSendTime = Simulator::Now ().ToInteger(Time::S);
+
   Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
   Vector myPos = MM->GetPosition();
   Vector myVel = MM->GetVelocity();
@@ -748,6 +848,9 @@ RoutingProtocol::SendPeriodicUpdate ()
   RoutingTableEntry rt (/* x */(uint16_t)myPos.x, /* y */(uint16_t)myPos.y, /* z */(uint16_t)myPos.z, /* vx */vx, /* vy */vy, /* vz */vz,
                                     /* timestamp */Simulator::Now ().ToInteger(Time::S), /* adress */Ipv4Address::GetLoopback ());
   m_routingTable.Update(rt);
+
+  // // 将本次更新的速度、方向记录
+  CalculateInformation(m_information);
 
   MyprotocolHeader myprotocolHeader;
   myprotocolHeader.SetX((uint16_t)myPos.x);
@@ -762,6 +865,10 @@ RoutingProtocol::SendPeriodicUpdate ()
 
   Ptr<Packet> packet = Create<Packet> ();
   packet->AddHeader (myprotocolHeader);
+
+  // std::cout<<"packet = "<<packet->ToString()<<"\n\n";
+
+  // std::cout<<"444444444444444444-packet-size = "<<packet->GetSize()<<"\npacket = "<<packet->ToString()<<"\n\n\n"; 
 
   for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j
        != m_socketAddresses.end (); ++j)
@@ -787,7 +894,9 @@ RoutingProtocol::SendPeriodicUpdate ()
       socket->SendTo (packet, 0, InetSocketAddress (destination, MYPROTOCOL_PORT));
       NS_LOG_FUNCTION ("PeriodicUpdate Packet UID is : " << packet->GetUid ());
     }
-  m_periodicUpdateTimer.Schedule (m_periodicUpdateInterval + MicroSeconds (25 * m_uniformRandomVariable->GetInteger (0,1000)));
+    if(!m_enableAdaptiveUpdate){
+      m_periodicUpdateTimer.Schedule (m_periodicUpdateInterval + MicroSeconds (25 * m_uniformRandomVariable->GetInteger (0,1000)));
+    }
 }
 
 void
