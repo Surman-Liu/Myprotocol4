@@ -132,11 +132,17 @@ MyprotocolHeader::Print (std::ostream &os) const
 //-----------------------------------------------------------------------------
 NS_OBJECT_ENSURE_REGISTERED (DataHeader);
 
-DataHeader::DataHeader (uint16_t dstPosx, uint16_t dstPosy, uint16_t dstPosz, uint16_t timestamp, 
+DataHeader::DataHeader (uint16_t dstPosx, uint16_t dstPosy, uint16_t dstPosz, 
+                        uint16_t dstVelx, uint16_t dstVely, uint16_t dstVelz, 
+                        uint16_t sign, uint16_t timestamp, 
                         uint16_t recPosx, uint16_t recPosy, uint16_t recPosz, uint16_t inRec)
   : m_dstPosx(dstPosx),
     m_dstPosy(dstPosy),
     m_dstPosz(dstPosz),
+    m_dstVelx(dstVelx),
+    m_dstVely(dstVely),
+    m_dstVelz(dstVelz),
+    m_dstSign(sign),
     m_timestamp(timestamp),
     m_recPosx (recPosx),
     m_recPosy (recPosy),
@@ -161,11 +167,11 @@ DataHeader::GetInstanceTypeId () const
   return GetTypeId ();
 }
 
-// 数据头大小2*8 = 16
+// 数据头大小2*12 = 24
 uint32_t
 DataHeader::GetSerializedSize () const
 {
-  return 16;
+  return 24;
 }
 
 void
@@ -174,6 +180,10 @@ DataHeader::Serialize (Buffer::Iterator i) const
   i.WriteHtonU16 (m_dstPosx);
   i.WriteHtonU16 (m_dstPosy);
   i.WriteHtonU16 (m_dstPosz);
+  i.WriteHtonU16 (m_dstVelx);
+  i.WriteHtonU16 (m_dstVely);
+  i.WriteHtonU16 (m_dstVelz);
+  i.WriteHtonU16 (m_dstSign);
   i.WriteHtonU16 (m_timestamp);
   i.WriteHtonU16 (m_recPosx);
   i.WriteHtonU16 (m_recPosy);
@@ -188,6 +198,10 @@ DataHeader::Deserialize (Buffer::Iterator start)
   m_dstPosx = i.ReadNtohU16 ();
   m_dstPosy = i.ReadNtohU16 ();
   m_dstPosz = i.ReadNtohU16 ();
+  m_dstVelx = i.ReadNtohU16 ();
+  m_dstVely = i.ReadNtohU16 ();
+  m_dstVelz = i.ReadNtohU16 ();
+  m_dstSign = i.ReadNtohU16 ();
   m_timestamp = i.ReadNtohU16 ();
   m_recPosx = i.ReadNtohU16 ();
   m_recPosy = i.ReadNtohU16 ();
@@ -206,6 +220,10 @@ DataHeader::Print (std::ostream &os) const
      << " PositionX: "  << m_dstPosx
      << " PositionY: " << m_dstPosy
      << " PositionZ: " << m_dstPosx
+     << " VelocityX: " << m_dstVelx
+     << " VelocityY: " << m_dstVely
+     << " VelocityZ: " << m_dstVelz
+     << " Sign: " << m_dstSign
      << " Timestamp: " << m_timestamp
      << " RecPositionX: " << m_recPosx
      << " RecPositionY: " << m_recPosy
@@ -223,7 +241,9 @@ operator<< (std::ostream & os, DataHeader const & h)
 bool
 DataHeader::operator== (DataHeader const & o) const
 {
-  return (m_dstPosx == o.m_dstPosx && m_dstPosy == o.m_dstPosy && m_dstPosz == o.m_dstPosz && m_timestamp == o.m_timestamp &&
+  return (m_dstPosx == o.m_dstPosx && m_dstPosy == o.m_dstPosy && m_dstPosz == o.m_dstPosz &&
+          m_dstVelx == o.m_dstVelx && m_dstVely == o.m_dstVely && m_dstVelz == o.m_dstVelz &&
+          m_dstSign == o.m_dstSign && m_timestamp == o.m_timestamp &&
           m_recPosx == o.m_recPosx && m_recPosy == o.m_recPosy && m_recPosz == o.m_recPosz && m_inRec == o.m_inRec);
 }
 }

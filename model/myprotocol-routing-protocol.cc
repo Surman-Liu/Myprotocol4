@@ -71,7 +71,7 @@ RoutingProtocol::GetTypeId (void)
                    MakeTimeAccessor (&RoutingProtocol::m_checkChangeInterval),
                    MakeTimeChecker ())
     .AddAttribute ("EnableAdaptiveUpdate","Enables adaptive update node information. ",
-                   BooleanValue (true),
+                   BooleanValue (false),
                    MakeBooleanAccessor (&RoutingProtocol::SetEnableAdaptiveUpdate,
                                         &RoutingProtocol::GetEnableAdaptiveUpdate),
                    MakeBooleanChecker ());            
@@ -193,14 +193,18 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p,
     DataHeader dataHeader;
     RoutingTableEntry rt;
     if(m_routingTable.LookupRoute(dst,rt)){
-      Vector dstPos;
-      dstPos.x = rt.GetX();
-      dstPos.y = rt.GetY();
-      dstPos.z = rt.GetZ();
+      // 将rt中关于目的地的位置、速度和时间戳写进dataHeader
+      uint16_t sign = SetRightVelocity(rt.GetVx(), rt.GetVy(), rt.GetVz());
       dataHeader.SetDstPosx(rt.GetX());
       dataHeader.SetDstPosy(rt.GetY());
       dataHeader.SetDstPosz(rt.GetZ());
+      dataHeader.SetDstVelx(abs(rt.GetVx()));
+      dataHeader.SetDstVely(abs(rt.GetVy()));
+      dataHeader.SetDstVelz(abs(rt.GetVz()));
+      dataHeader.SetSign(sign);
       dataHeader.SetTimestamp(rt.GetTimestamp());
+      // 根据预测的目的地位置，选择最优的下一跳
+      Vector dstPos = m_routingTable.PredictPosition(dst);
       Ipv4Address nexthop = m_routingTable.BestNeighbor(dstPos,myPos);
       // 数据包找到了合适的下一跳
       if(nexthop != Ipv4Address::GetZero ()){
@@ -410,6 +414,7 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
   Vector myPos = MM->GetPosition();
 
   Vector DstPosition;
+  Vector DstVelocity;
   uint16_t timestamp = 0;
   Vector RecPosition;
   uint16_t inRec = 0;
@@ -417,6 +422,7 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
   DstPosition.x = dataHeader.GetDstPosx ();
   DstPosition.y = dataHeader.GetDstPosy ();
   DstPosition.z = dataHeader.GetDstPosz ();
+  DstVelocity = GetRightVelocity(dataHeader.GetDstVelx(),dataHeader.GetDstVely(),dataHeader.GetDstVelz(),dataHeader.GetSign());
   timestamp = dataHeader.GetTimestamp();
   RecPosition.x = dataHeader.GetRecPosx ();
   RecPosition.y = dataHeader.GetRecPosy ();
@@ -428,15 +434,29 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
     // 更新目的地的最近地址
     if(rt.GetTimestamp() > timestamp){
       // 该节点的目的地地址更新
+      uint16_t sign = SetRightVelocity(rt.GetVx(),rt.GetVy(),rt.GetVz());
+      // 修改包头
       dataHeader.SetDstPosx(rt.GetX());
       dataHeader.SetDstPosy(rt.GetY());
       dataHeader.SetDstPosz(rt.GetZ());
+      dataHeader.SetDstVelx(abs(rt.GetVx()));
+      dataHeader.SetDstVely(abs(rt.GetVy()));
+      dataHeader.SetDstVelz(abs(rt.GetVz()));
+      dataHeader.SetSign(sign);
       dataHeader.SetTimestamp(rt.GetTimestamp());
+      // 修改用于预测位置的变量
       DstPosition.x = rt.GetX();
       DstPosition.y = rt.GetY();
       DstPosition.z = rt.GetZ();
+      DstVelocity.x = rt.GetVx();
+      DstVelocity.y = rt.GetVy();
+      DstVelocity.z = rt.GetVz();
+      timestamp = rt.GetTimestamp();
     }
   }
+
+  // 预测目的地现在的位置
+  Vector predictDst = PredictPosition(DstPosition, DstVelocity, timestamp);
 
   Ipv4Address nextHop;
   std::map<Ipv4Address, RoutingTableEntry> neighborTable;
@@ -467,7 +487,7 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
     // 如果目的地不是自己的邻居，也不是自己，则需要切换到正确的转发模式进行转发
 
     // 收到恢复状态发过来的包，如果距离比RecPosition更近，则切换为贪婪状态。
-    if(inRec == 1 && CalculateDistance (myPos, DstPosition) < CalculateDistance (RecPosition, DstPosition)){
+    if(inRec == 1 && CalculateDistance (myPos, predictDst) < CalculateDistance (RecPosition, predictDst)){
       inRec = 0;
       dataHeader.SetInRec(0);
       NS_LOG_LOGIC ("No longer in Recovery to " << dst << " in " << myPos);
@@ -494,7 +514,7 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
     if(inRec == 0){     //贪婪模式
       // 使用贪婪来寻找邻居表中离目的地最近的下一跳。
       // todo，这里应该自己传入目的地的坐标
-      nextHop = m_routingTable.BestNeighbor (DstPosition, myPos);
+      nextHop = m_routingTable.BestNeighbor (predictDst, myPos);
       if (nextHop != Ipv4Address::GetZero ())
       {
         dataHeader.SetInRec(0);
@@ -784,7 +804,7 @@ RoutingProtocol::CheckChange ()
 void
 RoutingProtocol::SendPeriodicUpdate ()
 { 
-  std::cout<<"send time interval = "<<Simulator::Now ().ToInteger(Time::S) - m_lastSendTime<<"\n";
+  // std::cout<<"send time interval = "<<Simulator::Now ().ToInteger(Time::S) - m_lastSendTime<<"\n";
   m_lastSendTime = Simulator::Now ().ToInteger(Time::S);
 
   Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
@@ -799,8 +819,6 @@ RoutingProtocol::SendPeriodicUpdate ()
   RoutingTableEntry rt (/* x */(uint16_t)myPos.x, /* y */(uint16_t)myPos.y, /* z */(uint16_t)myPos.z, /* vx */vx, /* vy */vy, /* vz */vz,
                                     /* timestamp */Simulator::Now ().ToInteger(Time::S), /* adress */Ipv4Address::GetLoopback ());
   m_routingTable.Update(rt);
-
-
 
   MyprotocolHeader myprotocolHeader;
   myprotocolHeader.SetX((uint16_t)myPos.x);

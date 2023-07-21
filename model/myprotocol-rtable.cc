@@ -149,12 +149,26 @@ RoutingTable::PredictPosition(Ipv4Address id){
     return Vector(-1,-1,-1);
   }else{
     // 先获取该节点的速度、位置、时间戳
-    // uint16_t deltaTime = Simulator::Now ().ToInteger(Time::S) - rt.GetTimestamp();
+    uint16_t deltaTime = Simulator::Now ().ToInteger(Time::S) - rt.GetTimestamp();
     // std::cout<<"deltaTime = "<<deltaTime<<"; now = "<<Simulator::Now ().ToInteger(Time::S)<<"; timestamp = "<<rt.GetTimestamp()<<"\n";
-    // uint16_t newX = rt.GetX() + deltaTime * rt.GetVx();
-    // uint16_t newY = rt.GetY() + deltaTime * rt.GetVy();
-    // uint16_t newZ = rt.GetZ() + deltaTime * rt.GetVz();
-    return Vector(rt.GetX(), rt.GetY(), rt.GetZ());
+    int16_t tempX = rt.GetX() + deltaTime * rt.GetVx();
+    int16_t tempY = rt.GetY() + deltaTime * rt.GetVy();
+    int16_t tempZ = rt.GetZ() + deltaTime * rt.GetVz();
+    uint16_t newX = tempX > 0 ? tempX : 0;
+    uint16_t newY = tempY > 0 ? tempY : 0;
+    uint16_t newZ = tempZ > 0 ? tempZ : 0;
+    uint16_t maxX = 1000;
+    uint16_t maxY = 1000;
+    uint16_t maxZ = 300;
+    newX = newX > maxX ? maxX : newX;
+    newY = newY > maxY ? maxY : newY;
+    newZ = newZ > maxZ ? maxZ : newZ;
+    // if(newX > 1000 || newY > 1000 || newZ > 300){
+    //   std::cout<<"X = "<<rt.GetX()<<", Y = "<<rt.GetY()<<", Z = "<<rt.GetZ()<<", newX = "<<newX<<", newY = "<<newY<<", newZ = "<<newZ
+    //   <<", time = "<<deltaTime<<"\n";
+    // }
+    return Vector(newX, newY, newZ);
+    // return Vector(rt.GetX(), rt.GetY(), rt.GetZ());
   }
 }
 
@@ -182,13 +196,13 @@ RoutingTable::LookupNeighbor(std::map<Ipv4Address, RoutingTableEntry> & neighbor
   }
 }
 
-// ADD：实现贪婪寻找最优下一条路径
+
+// ADD：实现贪婪寻找最优下一条路径，！！！dstPos：是经过预测后的目的地地址！！！
 Ipv4Address 
 RoutingTable::BestNeighbor (Vector dstPos, Vector myPos)
 {
   std::map<Ipv4Address, RoutingTableEntry> neighborTable;
   LookupNeighbor(neighborTable, myPos);
-  // Vector predictDstPos = PredictPosition(dst);
   if(CalculateDistance (dstPos, Vector(-1,-1,-1)) == 0){
     return Ipv4Address::GetZero ();
   }
@@ -221,9 +235,9 @@ RoutingTable::BestNeighbor (Vector dstPos, Vector myPos)
 // ADD：检查是否符合恢复模式的条件（有目的地地址&有邻居&没有可以使用贪婪的下一跳）
 bool 
 RoutingTable::MatchRecovery(Ipv4Address dst, Vector myPos){
-  if(CalculateDistance (PredictPosition(dst), Vector(-1,-1,-1)) == 0){
-    return false;
-  }
+  // if(CalculateDistance (PredictPosition(dst), Vector(-1,-1,-1)) == 0){
+  //   return false;
+  // }
   std::map<Ipv4Address, RoutingTableEntry> neighborTable;
   LookupNeighbor(neighborTable, myPos);
   if (neighborTable.empty ()){

@@ -295,6 +295,28 @@ private:
     return sign;
   }
 
+  // ADD:位置预测函数
+Vector PredictPosition(Vector pos, Vector vel, uint16_t timestamp){
+  // 先获取该节点的速度、位置、时间戳
+  uint16_t deltaTime = Simulator::Now ().ToInteger(Time::S) - timestamp;
+  int16_t tempX = pos.x + deltaTime * vel.x;
+  int16_t tempY = pos.y + deltaTime * vel.y;
+  int16_t tempZ = pos.y + deltaTime * vel.z;
+  uint16_t newX = tempX > 0 ? tempX : 0;
+  uint16_t newY = tempY > 0 ? tempY : 0;
+  uint16_t newZ = tempZ > 0 ? tempZ : 0;
+  uint16_t maxX = 1000;
+  uint16_t maxY = 1000;
+  uint16_t maxZ = 300;
+  newX = newX > maxX ? maxX : newX;
+  newY = newY > maxY ? maxY : newY;
+  newZ = newZ > maxZ ? maxZ : newZ;
+  // if(newX > 1000 || newY > 1000 || newZ > 300){
+  //   std::cout<<"X = "<<newX<<", Y = "<<newY<<", Z = "<<newZ<<"\n";
+  // }
+  return Vector(newX, newY, newZ);
+}
+
   /// ADD： If route exists and valid, forward packet.
   bool Forwarding (Ptr<const Packet> p, const Ipv4Header & header, UnicastForwardCallback ucb, ErrorCallback ecb);
 

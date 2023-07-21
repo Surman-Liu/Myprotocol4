@@ -162,7 +162,9 @@ class DataHeader : public Header
 {
 public:
   /// c-tor
-  DataHeader (uint16_t dstPosx = 0, uint16_t dstPosy = 0,uint16_t dstPosz = 0, uint16_t timestamp = 0, 
+  DataHeader (uint16_t dstPosx = 0, uint16_t dstPosy = 0, uint16_t dstPosz = 0, 
+              uint16_t dstVelx = 0, uint16_t dstVely = 0, uint16_t dstVelz = 0, 
+              uint16_t sign = 0, uint16_t timestamp = 0, 
               uint16_t recPosx = 0, uint16_t recPosy = 0, uint16_t recPosz = 0, uint16_t inRec  = 0);
 
   ///\name Header serialization/deserialization
@@ -197,6 +199,38 @@ public:
   uint16_t GetDstPosz () const
   {
     return m_dstPosz;
+  }
+  void SetDstVelx (uint16_t velx)
+  {
+    m_dstVelx = velx;
+  }
+  uint16_t GetDstVelx () const
+  {
+    return m_dstVelx;
+  }
+  void SetDstVely (uint16_t vely)
+  {
+    m_dstVely = vely;
+  }
+  uint16_t GetDstVely () const
+  {
+    return m_dstVely;
+  }
+  void SetDstVelz (uint16_t velz)
+  {
+    m_dstVelz = velz;
+  }
+  uint16_t GetDstVelz () const
+  {
+    return m_dstVelz;
+  }
+  void SetSign (uint16_t sign)
+  {
+    m_dstSign = sign;
+  }
+  uint16_t GetSign () const
+  {
+    return m_dstSign;
   }
   void SetTimestamp (uint16_t timestamp)
   {
@@ -242,14 +276,18 @@ public:
   bool operator== (DataHeader const & o) const;
 
 private:
-  uint16_t         m_dstPosx;          ///< Destination Position x
-  uint16_t         m_dstPosy;          ///< Destination Position x
-  uint16_t         m_dstPosz;
-  uint16_t         m_timestamp;          ///< 目的地时间的timestamp
-  uint16_t         m_recPosx;          ///< x of position that entered Recovery-mode
-  uint16_t         m_recPosy;          ///< y of position that entered Recovery-mode
-  uint16_t         m_recPosz; 
-  uint16_t         m_inRec;             ///< 1 if in Recovery-mode, 0 otherwise
+  uint16_t m_dstPosx;          ///< Destination Position x
+  uint16_t m_dstPosy;          ///< Destination Position x
+  uint16_t m_dstPosz;
+  uint16_t m_dstVelx;
+  uint16_t m_dstVely;
+  uint16_t m_dstVelz;
+  uint16_t m_dstSign;
+  uint16_t m_timestamp;          ///< 目的地时间的timestamp
+  uint16_t m_recPosx;          ///< x of position that entered Recovery-mode
+  uint16_t m_recPosy;          ///< y of position that entered Recovery-mode
+  uint16_t m_recPosz; 
+  uint16_t m_inRec;             ///< 1 if in Recovery-mode, 0 otherwise
 };
 
 std::ostream & operator<< (std::ostream & os, DataHeader const & h);

@@ -197,7 +197,7 @@ public:
   Print (Ptr<OutputStreamWrapper> stream) const;
 
   // ADD: 位置预测函数
-  Vector PredictPosition(Ipv4Address id);
+  Vector PredictPosition(Ipv4Address id); 
 
   // ADD：筛选邻居节点
   void LookupNeighbor(std::map<Ipv4Address, RoutingTableEntry> & neighborTable, Vector myPos);
@@ -209,7 +209,7 @@ public:
    * \param nodePos the position of the node that has the packet
    * \return Ipv4Address of the next hop, Ipv4Address::GetZero () if no nighbour was found in greedy mode
    */
-  Ipv4Address BestNeighbor (Vector dstPos, Vector myPos);
+  Ipv4Address BestNeighbor (Vector dstPos, Vector myPos);    //dstPos需要时经过预测后的目的地位置
 
   // ADD: 检查是否符合恢复模式的条件（有目的地地址&有邻居&没有可以使用贪婪的下一跳）
   bool MatchRecovery(Ipv4Address dst, Vector myPos);
