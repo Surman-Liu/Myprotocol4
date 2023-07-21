@@ -55,69 +55,6 @@ NS_OBJECT_ENSURE_REGISTERED (RoutingProtocol);
 /// UDP Port for myprotocol control traffic
 const uint32_t RoutingProtocol::MYPROTOCOL_PORT = 269;
 
-/// Tag used by myprotocol implementation
-struct DeferredRouteOutputTag : public Tag
-{
-  /// Positive if output device is fixed in RouteOutput
-  int32_t oif;
-
-  /**
-   * Constructor
-   *
-   * \param o outgoing interface (OIF)
-   */
-  DeferredRouteOutputTag (int32_t o = -1)
-    : Tag (),
-      oif (o)
-  {
-  }
-
-  /**
-   * \brief Get the type ID.
-   * \return the object TypeId
-   */
-  static TypeId
-  GetTypeId ()
-  {
-    static TypeId tid = TypeId ("ns3::myprotocol::DeferredRouteOutputTag")
-      .SetParent<Tag> ()
-      .SetGroupName ("Myprotocol")
-      .AddConstructor<DeferredRouteOutputTag> ()
-    ;
-    return tid;
-  }
-
-  TypeId
-  GetInstanceTypeId () const
-  {
-    return GetTypeId ();
-  }
-
-  uint32_t
-  GetSerializedSize () const
-  {
-    return sizeof(int32_t);
-  }
-
-  void
-  Serialize (TagBuffer i) const
-  {
-    i.WriteU32 (oif);
-  }
-
-  void
-  Deserialize (TagBuffer i)
-  {
-    oif = i.ReadU32 ();
-  }
-
-  void
-  Print (std::ostream &os) const
-  {
-    os << "DeferredRouteOutputTag: output interface = " << oif;
-  }
-};
-
 TypeId
 RoutingProtocol::GetTypeId (void)
 {
@@ -134,7 +71,7 @@ RoutingProtocol::GetTypeId (void)
                    MakeTimeAccessor (&RoutingProtocol::m_checkChangeInterval),
                    MakeTimeChecker ())
     .AddAttribute ("EnableAdaptiveUpdate","Enables adaptive update node information. ",
-                   BooleanValue (false),
+                   BooleanValue (true),
                    MakeBooleanAccessor (&RoutingProtocol::SetEnableAdaptiveUpdate,
                                         &RoutingProtocol::GetEnableAdaptiveUpdate),
                    MakeBooleanChecker ());            
@@ -159,13 +96,17 @@ RoutingProtocol::RoutingProtocol ()
     m_netTraversalTime (Time ((2 * m_netDiameter) * m_nodeTraversalTime)),
     m_pathDiscoveryTime ( Time (2 * m_netTraversalTime)),
     m_lastSendTime(0),
+    m_ifChangeLastTime(false),
     m_idCache(m_pathDiscoveryTime),            // 每个生命周期是2.4s
     m_periodicUpdateTimer (Timer::CANCEL_ON_DESTROY),
     m_checkChangeTimer(Timer::CANCEL_ON_DESTROY)
 {
-  m_information.speed = 0;
-  m_information.thetaXY = 0;
-  m_information.thetaZ = 0;
+  m_recordInformation.speed = 0;
+  m_recordInformation.thetaXY = 0;
+  m_recordInformation.thetaZ = 0;
+  m_sendInformation.speed = 0;
+  m_sendInformation.thetaXY = 0;
+  m_sendInformation.thetaZ = 0;
   m_uniformRandomVariable = CreateObject<UniformRandomVariable> ();
 }
 
@@ -808,16 +749,34 @@ RoutingProtocol::CheckChange ()
   // 计算当前信息
   CalculateInformation(information);
   // 计算差值
-  float deltaSpeed = fabs(information.speed - m_information.speed);
-  float deltaThetaXY = fabs(information.thetaXY - m_information.thetaXY);
-  float deltaThetaZ = fabs(information.thetaZ - m_information.thetaZ);
+  float recordDeltaSpeed = fabs(information.speed - m_recordInformation.speed);
+  float recordDeltaThetaXY = fabs(information.thetaXY - m_recordInformation.thetaXY);
+  float recordDeltaThetaZ = fabs(information.thetaZ - m_recordInformation.thetaZ);
   // 将角度阈值变成弧度
   float thetaThreshold = m_thetaThreshold * M_PI / 180;
   // 变化超出阈值，重新发送更新控制包
-  if(deltaSpeed > m_speedThreshold || deltaThetaXY > thetaThreshold || deltaThetaZ > thetaThreshold){
-    SendPeriodicUpdate();
+  if(recordDeltaSpeed > m_speedThreshold || recordDeltaThetaXY > thetaThreshold || recordDeltaThetaZ > thetaThreshold){
+    // 将本次更新的速度、方向记录
+    m_recordInformation = information;
+    // 如果不是连续时间
+    if(m_ifChangeLastTime == false){
+      SendPeriodicUpdate();
+      m_sendInformation = information;
+    }
+    m_ifChangeLastTime = true;
+  }else{
+    m_ifChangeLastTime = false;
+    // case：如果信息经过了连续变化终于趋向稳定，但是平静后的第一次检测却没有超过阈值，则不能及时发送最新的位置
+    float sendDeltaSpeed = fabs(information.speed - m_sendInformation.speed);
+    float sendDeltaThetaXY = fabs(information.thetaXY - m_sendInformation.thetaXY);
+    float sendDeltaThetaZ = fabs(information.thetaZ - m_sendInformation.thetaZ);
+    if(sendDeltaSpeed > m_speedThreshold || sendDeltaThetaXY > thetaThreshold || sendDeltaThetaZ > thetaThreshold){
+      // 虽然是false，但是已经很久没有发送新的控制包了，说明经过了连续变化，但是这不算true
+      SendPeriodicUpdate();
+      m_recordInformation = information;
+      m_sendInformation = information;
+    }
   }
-  // 开启定时器
   m_checkChangeTimer.Schedule (m_checkChangeInterval + MicroSeconds (25 * m_uniformRandomVariable->GetInteger (0,1000)));
 }
 
@@ -841,8 +800,7 @@ RoutingProtocol::SendPeriodicUpdate ()
                                     /* timestamp */Simulator::Now ().ToInteger(Time::S), /* adress */Ipv4Address::GetLoopback ());
   m_routingTable.Update(rt);
 
-  // // 将本次更新的速度、方向记录
-  CalculateInformation(m_information);
+
 
   MyprotocolHeader myprotocolHeader;
   myprotocolHeader.SetX((uint16_t)myPos.x);

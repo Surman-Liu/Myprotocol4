@@ -147,7 +147,8 @@ private:
   ErrorCallback m_ecb;
 
   // ADD：记录上次控制包中的方向和速度
-  struct Information m_information;
+  struct Information m_recordInformation;
+  struct Information m_sendInformation;
   uint16_t m_thetaThreshold;    //方向改变阈值
   uint16_t m_speedThreshold;    //速度改变阈值
 
@@ -161,7 +162,8 @@ private:
   Time m_netTraversalTime;             ///< Estimate of the average net traversal time.
   Time m_pathDiscoveryTime;            ///< Estimate of maximum time needed to find route in network.
 
-  uint16_t m_lastSendTime;
+  uint16_t m_lastSendTime;        //上次发送更新包的时间
+  bool m_ifChangeLastTime;    //在上一次检查中是否发送了更新包
 
   // ADD:id-cache
   IdCache m_idCache;
