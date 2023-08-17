@@ -164,6 +164,7 @@ private:
 
   uint16_t m_lastSendTime;        //上次发送更新包的时间
   bool m_ifChangeLastTime;    //在上一次检查中是否发送了更新包
+  uint16_t m_maxIntervalTime;    //最大不发送更新包的时间间隔
 
   // ADD:id-cache
   IdCache m_idCache;

@@ -116,7 +116,8 @@ MyprotocolHeader::Deserialize (Buffer::Iterator start)
 void
 MyprotocolHeader::Print (std::ostream &os) const
 {
-  os << " X: " << m_x
+  os << " length: " << GetSerializedSize()
+     << " X: " << m_x
      << " Y: " << m_y
      << " Z: " << m_z
      << " VX: " << m_vx
@@ -216,7 +217,7 @@ DataHeader::Deserialize (Buffer::Iterator start)
 void
 DataHeader::Print (std::ostream &os) const
 {
-  os 
+  os << " length: " << GetSerializedSize()
      << " PositionX: "  << m_dstPosx
      << " PositionY: " << m_dstPosy
      << " PositionZ: " << m_dstPosx
@@ -228,7 +229,7 @@ DataHeader::Print (std::ostream &os) const
      << " RecPositionX: " << m_recPosx
      << " RecPositionY: " << m_recPosy
      << " RecPositionZ: " << m_recPosz
-     << " inRec: " << m_inRec << "\n";
+     << " inRec: " << m_inRec;
 }
 
 std::ostream &

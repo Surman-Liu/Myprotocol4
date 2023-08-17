@@ -63,7 +63,7 @@ RoutingProtocol::GetTypeId (void)
     .SetGroupName ("Myprotocol")
     .AddConstructor<RoutingProtocol> ()
     .AddAttribute ("PeriodicUpdateInterval","Periodic interval between exchange of full routing tables among nodes. ",
-                   TimeValue (Seconds (10)),
+                   TimeValue (Seconds (5)),
                    MakeTimeAccessor (&RoutingProtocol::m_periodicUpdateInterval),
                    MakeTimeChecker ())
     .AddAttribute ("CheckChangeInterval","Check interval between compare speed and thata with thire threshold. ",
@@ -89,14 +89,15 @@ RoutingProtocol::AssignStreams (int64_t stream)
 // ADD：在此处初始化与id-cache相关的变量
 RoutingProtocol::RoutingProtocol ()
   : m_routingTable (),
-    m_thetaThreshold(5),
-    m_speedThreshold(5),
+    m_thetaThreshold(30),
+    m_speedThreshold(30),
     m_netDiameter (15),                                    //最大跳数，1000*根号二/250m = 6hops
     m_nodeTraversalTime (MilliSeconds (40)),               //一跳的传播速度，250m / 299792458m/s = 
     m_netTraversalTime (Time ((2 * m_netDiameter) * m_nodeTraversalTime)),
     m_pathDiscoveryTime ( Time (2 * m_netTraversalTime)),
     m_lastSendTime(0),
     m_ifChangeLastTime(false),
+    m_maxIntervalTime(30),
     m_idCache(m_pathDiscoveryTime),            // 每个生命周期是2.4s
     m_periodicUpdateTimer (Timer::CANCEL_ON_DESTROY),
     m_checkChangeTimer(Timer::CANCEL_ON_DESTROY)
@@ -688,15 +689,13 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
     }
   }
   
-  packet->AddHeader(myprotocolHeader);
+  Ptr<Packet> p = Create<Packet> ();
+  p->AddHeader(myprotocolHeader);
   for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j
        != m_socketAddresses.end (); ++j)
   {
     Ptr<Socket> socket = j->first;
     Ipv4InterfaceAddress iface = j->second;
-    // question：这个send函数在这里有什么用？？？
-    socket->Send (packet);
-    // Send to all-hosts broadcast if on /32 addr, subnet-directed otherwise
     Ipv4Address destination;
     if (iface.GetMask () == Ipv4Mask::GetOnes ())
       {
@@ -706,7 +705,7 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
       {
         destination = iface.GetBroadcast ();
       }
-    socket->SendTo (packet, 0, InetSocketAddress (destination, MYPROTOCOL_PORT));
+    socket->SendTo (p, 0, InetSocketAddress (destination, MYPROTOCOL_PORT));
   }
 }
 
@@ -775,28 +774,40 @@ RoutingProtocol::CheckChange ()
   // 将角度阈值变成弧度
   float thetaThreshold = m_thetaThreshold * M_PI / 180;
   // 变化超出阈值，重新发送更新控制包
+  // 1. 超出阈值就更新
   if(recordDeltaSpeed > m_speedThreshold || recordDeltaThetaXY > thetaThreshold || recordDeltaThetaZ > thetaThreshold){
     // 将本次更新的速度、方向记录
     m_recordInformation = information;
-    // 如果不是连续时间
-    if(m_ifChangeLastTime == false){
-      SendPeriodicUpdate();
-      m_sendInformation = information;
-    }
-    m_ifChangeLastTime = true;
-  }else{
-    m_ifChangeLastTime = false;
-    // case：如果信息经过了连续变化终于趋向稳定，但是平静后的第一次检测却没有超过阈值，则不能及时发送最新的位置
-    float sendDeltaSpeed = fabs(information.speed - m_sendInformation.speed);
-    float sendDeltaThetaXY = fabs(information.thetaXY - m_sendInformation.thetaXY);
-    float sendDeltaThetaZ = fabs(information.thetaZ - m_sendInformation.thetaZ);
-    if(sendDeltaSpeed > m_speedThreshold || sendDeltaThetaXY > thetaThreshold || sendDeltaThetaZ > thetaThreshold){
-      // 虽然是false，但是已经很久没有发送新的控制包了，说明经过了连续变化，但是这不算true
-      SendPeriodicUpdate();
-      m_recordInformation = information;
-      m_sendInformation = information;
-    }
+    SendPeriodicUpdate();
   }
+  // 如果超过最大间隔时间没有发送更新包，则发送
+  if(Simulator::Now ().ToInteger(Time::S) - m_lastSendTime > m_maxIntervalTime){
+    m_recordInformation = information;
+    SendPeriodicUpdate();
+  }
+  // 2. 连续变化不更新
+  // if(recordDeltaSpeed > m_speedThreshold || recordDeltaThetaXY > thetaThreshold || recordDeltaThetaZ > thetaThreshold){
+  //   // 将本次更新的速度、方向记录
+  //   m_recordInformation = information;
+  //   // 如果不是连续时间
+  //   if(m_ifChangeLastTime == false){
+  //     SendPeriodicUpdate();
+  //     m_sendInformation = information;
+  //   }
+  //   m_ifChangeLastTime = true;
+  // }else{
+  //   m_ifChangeLastTime = false;
+  //   // case：如果信息经过了连续变化终于趋向稳定，但是平静后的第一次检测却没有超过阈值，则不能及时发送最新的位置
+  //   float sendDeltaSpeed = fabs(information.speed - m_sendInformation.speed);
+  //   float sendDeltaThetaXY = fabs(information.thetaXY - m_sendInformation.thetaXY);
+  //   float sendDeltaThetaZ = fabs(information.thetaZ - m_sendInformation.thetaZ);
+  //   if(sendDeltaSpeed > m_speedThreshold || sendDeltaThetaXY > thetaThreshold || sendDeltaThetaZ > thetaThreshold){
+  //     // 虽然是false，但是已经很久没有发送新的控制包了，说明经过了连续变化，但是这不算true
+  //     SendPeriodicUpdate();
+  //     m_recordInformation = information;
+  //     m_sendInformation = information;
+  //   }
+  // }
   m_checkChangeTimer.Schedule (m_checkChangeInterval + MicroSeconds (25 * m_uniformRandomVariable->GetInteger (0,1000)));
 }
 
@@ -843,9 +854,6 @@ RoutingProtocol::SendPeriodicUpdate ()
       // ADD:在id-cache中添加这个控制包
       m_idCache.IsDuplicate (m_ipv4->GetAddress (1, 0).GetLocal (), myprotocolHeader.GetTimestamp());
 
-      // question：这个send函数在这里有什么用？？？
-      socket->Send (packet);
-      // Send to all-hosts broadcast if on /32 addr, subnet-directed otherwise
       Ipv4Address destination;
       if (iface.GetMask () == Ipv4Mask::GetOnes ())
         {
