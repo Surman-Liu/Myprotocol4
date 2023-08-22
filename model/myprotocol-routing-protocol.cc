@@ -293,7 +293,7 @@ RoutingProtocol::RouteInput (Ptr<const Packet> p,
 
   // Deferred route request，收到回环的数据包
   // todo:可以使用队列。
-  if (EnableBuffering == true && idev == m_lo)
+  if (idev == m_lo)
     {
       return false;
     }

@@ -155,7 +155,7 @@ DataHeader::DataHeader (uint16_t dstPosx, uint16_t dstPosy, uint16_t dstPosz,
 TypeId
 DataHeader::GetTypeId ()
 {
-  static TypeId tid = TypeId ("ns3::gpsr::DataHeader")
+  static TypeId tid = TypeId ("ns3::myprotocol::DataHeader")
     .SetParent<Header> ()
     .AddConstructor<DataHeader> ()
   ;
