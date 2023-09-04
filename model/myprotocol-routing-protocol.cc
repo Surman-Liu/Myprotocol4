@@ -89,15 +89,15 @@ RoutingProtocol::AssignStreams (int64_t stream)
 // ADD：在此处初始化与id-cache相关的变量
 RoutingProtocol::RoutingProtocol ()
   : m_routingTable (),
-    m_thetaThreshold(20),         //角度变化超过10度发送更新
-    m_speedThreshold(20),         //速度变化超过10m/s发送更新
+    m_thetaThreshold(15),         //角度变化超过10度发送更新
+    m_speedThreshold(15),         //速度变化超过10m/s发送更新
     m_netDiameter (15),                                    //最大跳数，1000*根号二/250m = 6hops
     m_nodeTraversalTime (MilliSeconds (40)),               //一跳的传播速度，250m / 299792458m/s = 
     m_netTraversalTime (Time ((2 * m_netDiameter) * m_nodeTraversalTime)),
     m_pathDiscoveryTime ( Time (2 * m_netTraversalTime)),
     m_lastSendTime(0),
     m_ifChangeLastTime(false),
-    m_maxIntervalTime(30),
+    m_maxIntervalTime(20),
     m_idCache(m_pathDiscoveryTime),            // 每个生命周期是2.4s
     m_maxQueueLen (64),
     m_maxQueueTime (Seconds (30)),
@@ -148,11 +148,11 @@ RoutingProtocol::Start ()
 {
   m_scb = MakeCallback (&RoutingProtocol::Send,this);
   m_ecb = MakeCallback (&RoutingProtocol::Drop,this);
-  SendPeriodicUpdate();
   if(!m_enableAdaptiveUpdate){
     m_periodicUpdateTimer.SetFunction (&RoutingProtocol::SendPeriodicUpdate,this);
     m_periodicUpdateTimer.Schedule (MicroSeconds (m_uniformRandomVariable->GetInteger (0,1000)));
   }else{
+    SendPeriodicUpdate();
     m_checkChangeTimer.SetFunction (&RoutingProtocol::CheckChange,this);
     m_checkChangeTimer.Schedule (MicroSeconds (m_uniformRandomVariable->GetInteger (0,1000)));
   }
