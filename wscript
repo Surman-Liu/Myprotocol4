@@ -8,7 +8,8 @@ def build(bld):
         'model/myprotocol-packet.cc',
         'model/myprotocol-routing-protocol.cc',
         'model/myprotocol-id-cache.cc',
-        'helper/myprotocol-helper.cc',
+        'model/myprotocol-rqueue.cc',
+        'helper/myprotocol-helper.cc'
         ]
 
     # module_test = bld.create_ns3_module_test_library('myprotocol')
@@ -23,6 +24,7 @@ def build(bld):
         'model/myprotocol-packet.h',
         'model/myprotocol-routing-protocol.h',
         'model/myprotocol-id-cache.h',
+        'model/myprotocol-rqueue.h',
         'helper/myprotocol-helper.h',
         ]
     if (bld.env['ENABLE_EXAMPLES']):

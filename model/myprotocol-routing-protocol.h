@@ -36,6 +36,7 @@
 #include "myprotocol-rtable.h"
 #include "myprotocol-packet.h"
 #include "myprotocol-id-cache.h"
+#include "myprotocol-rqueue.h"
 #include "ns3/node.h"
 #include "ns3/random-variable-stream.h"
 #include "ns3/ipv4-routing-protocol.h"
@@ -118,6 +119,17 @@ public:
    */
   int64_t AssignStreams (int64_t stream);
 
+  void SetMaxQueueLen (uint32_t len)
+  {
+    m_maxQueueLen = len;
+    m_queue.SetMaxQueueLen (len);
+  }
+  void SetMaxQueueTime (Time t)
+  {
+    m_maxQueueTime = t;
+    m_queue.SetQueueTimeout (t);
+  }
+
 private:
   // Protocol parameters.
   /// PeriodicUpdateInterval specifies the periodic time interval between which the a node broadcasts
@@ -169,6 +181,11 @@ private:
   // ADD:id-cache
   IdCache m_idCache;
 
+  uint32_t m_maxQueueLen;              ///< The maximum number of packets that we allow a routing protocol to buffer.
+  Time m_maxQueueTime;
+  // ADD:queue
+  RequestQueue m_queue;
+
 private:
   /// Start protocol operation
   void
@@ -209,23 +226,12 @@ private:
    */
   Ptr<Ipv4Route>
   LoopbackRoute (const Ipv4Header & header, Ptr<NetDevice> oif) const;
-  /**
-   * Get settlingTime for a destination
-   * \param dst - destination address
-   * \return settlingTime for the destination if found
-   */
-  // Time
-  // GetSettlingTime (Ipv4Address dst);
-  /// Sends trigger update from a node
-  // void
-  // SendTriggeredUpdate ();
-  /// Broadcasts the entire routing table for every PeriodicUpdateInterval
+
   void
   SendPeriodicUpdate ();
-  /// Merge periodic updates
-  // void
-  // MergeTriggerPeriodicUpdates ();
-  /// Notify that packet is dropped for some reason
+
+  void SendPacketFromQueue (Ipv4Address dst, Ptr<Ipv4Route> route, DataHeader dataHeader);
+
   void
   Drop (Ptr<const Packet>, const Ipv4Header &, Socket::SocketErrno);
 
@@ -238,91 +244,15 @@ private:
   CalculateInformation (struct Information &information);
 
   // ADD:转换速度符号的两个函数。sign：记录速度是否为负数，0:都不是负数，1:X轴速度为负，2:Y轴速度为负，3:Z轴速度为负,4：xy为负数，5：xz为负数，6：yz为负数，7：全部都是负数
-  Vector GetRightVelocity(uint16_t vx, uint16_t vy, uint16_t vz, uint16_t sign){
-    if(sign == 0){
-      return Vector(vx,vy,vz);
-    }
-    if(sign == 1){
-      return Vector(-vx,vy,vz);
-    }
-    if(sign == 2){
-      return Vector(vx,-vy,vz);
-    }
-    if(sign == 3){
-      return Vector(vx,vy,-vz);
-    }
-    if(sign == 4){
-      return Vector(-vx,-vy,vz);
-    }
-    if(sign == 5){
-      return Vector(-vx,vy,-vz);
-    }
-    if(sign == 6){
-      return Vector(vx,-vy,-vz);
-    }
-    if(sign == 7){
-      return Vector(-vx,-vy,-vz);
-    }
-    std::cout<<"sign is wrong!!!\n";
-    return Vector(0,0,0);
-  }
+  Vector GetRightVelocity(uint16_t vx, uint16_t vy, uint16_t vz, uint16_t sign);
 
-  uint16_t SetRightVelocity(int16_t vx, int16_t vy, int16_t vz){
-    uint16_t sign = 9;
-    if(vx >= 0 && vy >= 0 && vz >= 0){
-      sign = 0;
-    }
-    if(vx < 0 && vy >= 0 && vz >= 0){
-      sign = 1;
-    }
-    if(vx >= 0 && vy < 0 && vz >= 0){
-      sign = 2;
-    }
-    if(vx >= 0 && vy >= 0 && vz < 0){
-      sign = 3;
-    }
-    if(vx < 0 && vy < 0 && vz >= 0){
-      sign = 4;
-    }
-    if(vx < 0 && vy >= 0 && vz < 0){
-      sign = 5;
-    }
-    if(vx >= 0 && vy < 0 && vz < 0){
-      sign = 6;
-    }
-    if(vx < 0 && vy < 0 && vz < 0){
-      sign = 7;
-    }
-    return sign;
-  }
-
-  // ADD:位置预测函数
-Vector PredictPosition(Vector pos, Vector vel, uint16_t timestamp){
-  // 先获取该节点的速度、位置、时间戳
-  uint16_t deltaTime = Simulator::Now ().ToInteger(Time::S) - timestamp;
-  int16_t tempX = pos.x + deltaTime * vel.x;
-  int16_t tempY = pos.y + deltaTime * vel.y;
-  int16_t tempZ = pos.y + deltaTime * vel.z;
-  uint16_t newX = tempX > 0 ? tempX : 0;
-  uint16_t newY = tempY > 0 ? tempY : 0;
-  uint16_t newZ = tempZ > 0 ? tempZ : 0;
-  uint16_t maxX = 1000;
-  uint16_t maxY = 1000;
-  uint16_t maxZ = 300;
-  newX = newX > maxX ? maxX : newX;
-  newY = newY > maxY ? maxY : newY;
-  newZ = newZ > maxZ ? maxZ : newZ;
-  // if(newX > 1000 || newY > 1000 || newZ > 300){
-  //   std::cout<<"X = "<<newX<<", Y = "<<newY<<", Z = "<<newZ<<"\n";
-  // }
-  return Vector(newX, newY, newZ);
-}
+  uint16_t SetRightVelocity(int16_t vx, int16_t vy, int16_t vz);
 
   /// ADD： If route exists and valid, forward packet.
   bool Forwarding (Ptr<const Packet> p, const Ipv4Header & header, UnicastForwardCallback ucb, ErrorCallback ecb);
 
   // ADD:恢复模式
-  Ipv4Address RecoveryMode(Ptr<Packet> p, Ipv4Header header);
+  Ipv4Address RecoveryMode(std::map<Ipv4Address, RoutingTableEntry> & neighborTable);
 
   /// Timer to trigger periodic updates from a node
   Timer m_periodicUpdateTimer;

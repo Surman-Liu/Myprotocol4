@@ -64,12 +64,15 @@ RoutingTableEntry::~RoutingTableEntry ()
 
 RoutingTable::RoutingTable ()
 {
+  // 每个表项的有效生存时间为maxIntervalTime
+  m_entryLifeTime = 10;
 }
 
 bool
 RoutingTable::LookupRoute (Ipv4Address id,
                            RoutingTableEntry & rt)
 {
+  Purge();
   if (m_positionTable.empty ())
     {
       return false;
@@ -108,7 +111,7 @@ RoutingTable::Update (RoutingTableEntry & rt)
   std::map<Ipv4Address, RoutingTableEntry>::iterator i = m_positionTable.find (rt.GetAdress ());
   if (i == m_positionTable.end ())
     {
-      return false;
+      AddRoute(rt);
     }
   i->second = rt;
   return true;
@@ -163,12 +166,7 @@ RoutingTable::PredictPosition(Ipv4Address id){
     newX = newX > maxX ? maxX : newX;
     newY = newY > maxY ? maxY : newY;
     newZ = newZ > maxZ ? maxZ : newZ;
-    // if(newX > 1000 || newY > 1000 || newZ > 300){
-    //   std::cout<<"X = "<<rt.GetX()<<", Y = "<<rt.GetY()<<", Z = "<<rt.GetZ()<<", newX = "<<newX<<", newY = "<<newY<<", newZ = "<<newZ
-    //   <<", time = "<<deltaTime<<"\n";
-    // }
     return Vector(newX, newY, newZ);
-    // return Vector(rt.GetX(), rt.GetY(), rt.GetZ());
   }
 }
 
@@ -199,10 +197,8 @@ RoutingTable::LookupNeighbor(std::map<Ipv4Address, RoutingTableEntry> & neighbor
 
 // ADD：实现贪婪寻找最优下一条路径，！！！dstPos：是经过预测后的目的地地址！！！
 Ipv4Address 
-RoutingTable::BestNeighbor (Vector dstPos, Vector myPos)
+RoutingTable::BestNeighbor (std::map<Ipv4Address, RoutingTableEntry> neighborTable, Vector dstPos, Vector myPos)
 {
-  std::map<Ipv4Address, RoutingTableEntry> neighborTable;
-  LookupNeighbor(neighborTable, myPos);
   if(CalculateDistance (dstPos, Vector(-1,-1,-1)) == 0){
     return Ipv4Address::GetZero ();
   }
@@ -232,18 +228,24 @@ RoutingTable::BestNeighbor (Vector dstPos, Vector myPos)
   }
 }
 
-// ADD：检查是否符合恢复模式的条件（有目的地地址&有邻居&没有可以使用贪婪的下一跳）
-bool 
-RoutingTable::MatchRecovery(Ipv4Address dst, Vector myPos){
-  // if(CalculateDistance (PredictPosition(dst), Vector(-1,-1,-1)) == 0){
-  //   return false;
-  // }
-  std::map<Ipv4Address, RoutingTableEntry> neighborTable;
-  LookupNeighbor(neighborTable, myPos);
-  if (neighborTable.empty ()){
-    return false;
+// ADD：清理过期表项
+void
+RoutingTable::Purge(){
+  if (m_positionTable.empty ())
+  {
+    return;
   }
-  return true;
+
+  for (std::map<Ipv4Address, RoutingTableEntry>::iterator i = m_positionTable.begin (); i != m_positionTable.end (); ){
+    if (m_entryLifeTime + i->second.GetTimestamp() <= Simulator::Now ().ToInteger(Time::S)){
+      std::map<Ipv4Address, RoutingTableEntry>::iterator itmp = i;
+      ++i;
+      m_positionTable.erase (itmp);
+    }else{
+      ++i;
+    }
+  }
+  return;
 }
 
 }

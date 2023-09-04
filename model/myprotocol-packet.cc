@@ -135,20 +135,23 @@ NS_OBJECT_ENSURE_REGISTERED (DataHeader);
 
 DataHeader::DataHeader (uint16_t dstPosx, uint16_t dstPosy, uint16_t dstPosz, 
                         uint16_t dstVelx, uint16_t dstVely, uint16_t dstVelz, 
-                        uint16_t sign, uint16_t timestamp, 
-                        uint16_t recPosx, uint16_t recPosy, uint16_t recPosz, uint16_t inRec)
+                        uint16_t dstSign, uint16_t dstTimestamp,
+                        uint16_t recPosx, uint16_t recPosy, uint16_t recPosz, uint16_t inRec,
+                        uint64_t uid, uint16_t hop)
   : m_dstPosx(dstPosx),
     m_dstPosy(dstPosy),
     m_dstPosz(dstPosz),
     m_dstVelx(dstVelx),
     m_dstVely(dstVely),
     m_dstVelz(dstVelz),
-    m_dstSign(sign),
-    m_timestamp(timestamp),
+    m_dstSign(dstSign),
+    m_dstTimestamp(dstTimestamp),
     m_recPosx (recPosx),
     m_recPosy (recPosy),
     m_recPosz (recPosz),
-    m_inRec (inRec)
+    m_inRec (inRec),
+    m_uid(uid),
+    m_hop(hop)
 {
 }
 
@@ -168,11 +171,11 @@ DataHeader::GetInstanceTypeId () const
   return GetTypeId ();
 }
 
-// 数据头大小2*12 = 24
+// 数据头大小2*13 + 8*1 = 34
 uint32_t
 DataHeader::GetSerializedSize () const
 {
-  return 24;
+  return 34;
 }
 
 void
@@ -185,11 +188,13 @@ DataHeader::Serialize (Buffer::Iterator i) const
   i.WriteHtonU16 (m_dstVely);
   i.WriteHtonU16 (m_dstVelz);
   i.WriteHtonU16 (m_dstSign);
-  i.WriteHtonU16 (m_timestamp);
+  i.WriteHtonU16 (m_dstTimestamp);
   i.WriteHtonU16 (m_recPosx);
   i.WriteHtonU16 (m_recPosy);
   i.WriteHtonU16 (m_recPosz);
   i.WriteHtonU16 (m_inRec);
+  i.WriteHtonU64 (m_uid);
+  i.WriteHtonU16 (m_hop);
 }
 
 uint32_t
@@ -203,11 +208,13 @@ DataHeader::Deserialize (Buffer::Iterator start)
   m_dstVely = i.ReadNtohU16 ();
   m_dstVelz = i.ReadNtohU16 ();
   m_dstSign = i.ReadNtohU16 ();
-  m_timestamp = i.ReadNtohU16 ();
+  m_dstTimestamp = i.ReadNtohU16 ();
   m_recPosx = i.ReadNtohU16 ();
   m_recPosy = i.ReadNtohU16 ();
   m_recPosz = i.ReadNtohU16 ();
   m_inRec = i.ReadNtohU16 ();
+  m_uid = i.ReadNtohU64 ();
+  m_hop = i.ReadNtohU16 ();
 
   uint32_t dist = i.GetDistanceFrom (start);
   NS_ASSERT (dist == GetSerializedSize ());
@@ -218,18 +225,20 @@ void
 DataHeader::Print (std::ostream &os) const
 {
   os << " length: " << GetSerializedSize()
-     << " PositionX: "  << m_dstPosx
-     << " PositionY: " << m_dstPosy
-     << " PositionZ: " << m_dstPosx
-     << " VelocityX: " << m_dstVelx
-     << " VelocityY: " << m_dstVely
-     << " VelocityZ: " << m_dstVelz
-     << " Sign: " << m_dstSign
-     << " Timestamp: " << m_timestamp
+     << " dstPositionX: "  << m_dstPosx
+     << " dstPositionY: " << m_dstPosy
+     << " dstPositionZ: " << m_dstPosx
+     << " dstVelocityX: " << m_dstVelx
+     << " dstVelocityY: " << m_dstVely
+     << " dstVelocityZ: " << m_dstVelz
+     << " dstSign: " << m_dstSign
+     << " dstTimestamp: " << m_dstTimestamp
      << " RecPositionX: " << m_recPosx
      << " RecPositionY: " << m_recPosy
      << " RecPositionZ: " << m_recPosz
-     << " inRec: " << m_inRec;
+     << " inRec: " << m_inRec
+     << " uid: "<<m_uid
+     << " hop: "<<m_hop;
 }
 
 std::ostream &
@@ -244,8 +253,9 @@ DataHeader::operator== (DataHeader const & o) const
 {
   return (m_dstPosx == o.m_dstPosx && m_dstPosy == o.m_dstPosy && m_dstPosz == o.m_dstPosz &&
           m_dstVelx == o.m_dstVelx && m_dstVely == o.m_dstVely && m_dstVelz == o.m_dstVelz &&
-          m_dstSign == o.m_dstSign && m_timestamp == o.m_timestamp &&
-          m_recPosx == o.m_recPosx && m_recPosy == o.m_recPosy && m_recPosz == o.m_recPosz && m_inRec == o.m_inRec);
+          m_dstSign == o.m_dstSign && m_dstTimestamp == o.m_dstTimestamp &&
+          m_recPosx == o.m_recPosx && m_recPosy == o.m_recPosy && m_recPosz == o.m_recPosz &&
+           m_inRec == o.m_inRec && m_uid == o.m_uid && m_hop == o.m_hop);
 }
 }
 }

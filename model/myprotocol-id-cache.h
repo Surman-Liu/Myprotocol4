@@ -47,7 +47,7 @@ public:
    * \param id the cache entry ID
    * \returns true if the pair exists
    */ 
-  bool IsDuplicate (Ipv4Address addr, uint32_t id);
+  bool IsDuplicate (Ipv4Address addr, uint16_t timestamp);
   /// Remove all expired entries
   void Purge ();
   /**
@@ -77,7 +77,7 @@ private:
     /// ID is supposed to be unique in single address context (e.g. sender address)
     Ipv4Address m_context;
     /// The id
-    uint32_t m_timestamp;
+    uint16_t m_timestamp;
     /// When record will expire
     Time m_expire;
   };

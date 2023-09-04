@@ -21,7 +21,7 @@
 namespace ns3 {
 namespace myprotocol {
 bool
-IdCache::IsDuplicate (Ipv4Address addr, uint32_t timestamp)
+IdCache::IsDuplicate (Ipv4Address addr, uint16_t timestamp)
 {
   Purge ();
   for (std::vector<UniqueId>::const_iterator i = m_idCache.begin ();

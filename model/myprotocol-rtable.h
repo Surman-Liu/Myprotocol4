@@ -69,7 +69,8 @@ public:
    * \param changedEntries flag for changed entries
    */
   // ADD:在构造函数中添加位置、速度、时间戳
-  RoutingTableEntry (uint16_t x = 0,uint16_t y = 0,uint16_t z = 0, int16_t vx = 0,int16_t vy = 0,int16_t vz = 0,
+  RoutingTableEntry (uint16_t x = 0,uint16_t y = 0,uint16_t z = 0, 
+                    int16_t vx = 0,int16_t vy = 0,int16_t vz = 0,
                     uint16_t timestamp = 0, Ipv4Address adress = Ipv4Address ());
 
   ~RoutingTableEntry ();
@@ -209,13 +210,14 @@ public:
    * \param nodePos the position of the node that has the packet
    * \return Ipv4Address of the next hop, Ipv4Address::GetZero () if no nighbour was found in greedy mode
    */
-  Ipv4Address BestNeighbor (Vector dstPos, Vector myPos);    //dstPos需要时经过预测后的目的地位置
+  Ipv4Address BestNeighbor (std::map<Ipv4Address, RoutingTableEntry> neighborTable, Vector dstPos, Vector myPos);    //dstPos需要时经过预测后的目的地位置
 
-  // ADD: 检查是否符合恢复模式的条件（有目的地地址&有邻居&没有可以使用贪婪的下一跳）
-  bool MatchRecovery(Ipv4Address dst, Vector myPos);
+  void Purge();
 
 private:
   // Fields
+  // 表项过期时间
+  uint16_t m_entryLifeTime;
   /// an entry in the routing table.
   std::map<Ipv4Address, RoutingTableEntry> m_positionTable;
   /// neighbor table

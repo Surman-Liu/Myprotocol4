@@ -164,8 +164,9 @@ public:
   /// c-tor
   DataHeader (uint16_t dstPosx = 0, uint16_t dstPosy = 0, uint16_t dstPosz = 0, 
               uint16_t dstVelx = 0, uint16_t dstVely = 0, uint16_t dstVelz = 0, 
-              uint16_t sign = 0, uint16_t timestamp = 0, 
-              uint16_t recPosx = 0, uint16_t recPosy = 0, uint16_t recPosz = 0, uint16_t inRec  = 0);
+              uint16_t dstSign = 0, uint16_t dstTimestamp = 0, 
+              uint16_t recPosx = 0, uint16_t recPosy = 0, uint16_t recPosz = 0, uint16_t inRec  = 0,
+              uint64_t uid = 0, uint16_t hop = 0);
 
   ///\name Header serialization/deserialization
   static TypeId GetTypeId ();
@@ -224,21 +225,21 @@ public:
   {
     return m_dstVelz;
   }
-  void SetSign (uint16_t sign)
+  void SetDstSign (uint16_t sign)
   {
     m_dstSign = sign;
   }
-  uint16_t GetSign () const
+  uint16_t GetDstSign () const
   {
     return m_dstSign;
   }
-  void SetTimestamp (uint16_t timestamp)
+  void SetDstTimestamp (uint16_t timestamp)
   {
-    m_timestamp = timestamp;
+    m_dstTimestamp = timestamp;
   }
-  uint16_t GetTimestamp () const
+  uint16_t GetDstTimestamp () const
   {
-    return m_timestamp;
+    return m_dstTimestamp;
   }
   void SetRecPosx (uint16_t posx)
   {
@@ -272,6 +273,22 @@ public:
   {
     return m_inRec;
   }
+  void SetUid (uint64_t uid)
+  {
+    m_uid = uid;
+  }
+  uint64_t GetUid () const
+  {
+    return m_uid;
+  }
+  void SetHop (uint16_t hop)
+  {
+    m_hop = hop;
+  }
+  uint16_t GetHop () const
+  {
+    return m_hop;
+  }
 
   bool operator== (DataHeader const & o) const;
 
@@ -283,11 +300,15 @@ private:
   uint16_t m_dstVely;
   uint16_t m_dstVelz;
   uint16_t m_dstSign;
-  uint16_t m_timestamp;          ///< 目的地时间的timestamp
+  uint16_t m_dstTimestamp;          ///< 目的地时间的timestamp
+
   uint16_t m_recPosx;          ///< x of position that entered Recovery-mode
   uint16_t m_recPosy;          ///< y of position that entered Recovery-mode
   uint16_t m_recPosz; 
-  uint16_t m_inRec;             ///< 1 if in Recovery-mode, 0 otherwise
+  uint16_t m_inRec;             ///< 1 if in Recovery-mode, 0 greedy-mode
+
+  uint64_t m_uid;
+  uint16_t m_hop;
 };
 
 std::ostream & operator<< (std::ostream & os, DataHeader const & h);
