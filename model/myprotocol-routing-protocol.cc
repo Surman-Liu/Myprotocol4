@@ -55,6 +55,75 @@ NS_OBJECT_ENSURE_REGISTERED (RoutingProtocol);
 /// UDP Port for myprotocol control traffic
 const uint32_t RoutingProtocol::MYPROTOCOL_PORT = 269;
 
+class DeferredRouteOutputTag : public Tag
+{
+
+public:
+  /**
+   * \brief Constructor
+   * \param o the output interface
+   */
+  DeferredRouteOutputTag (uint16_t ifNeedQueue = 0) 
+    : Tag (),
+      m_ifNeedQueue (ifNeedQueue)
+  {
+  }
+
+  /**
+   * \brief Get the type ID.
+   * \return the object TypeId
+   */
+  static TypeId GetTypeId ()
+  {
+    static TypeId tid = TypeId ("ns3::myprotocol::DeferredRouteOutputTag")
+      .SetParent<Tag> ()
+      .SetGroupName ("Myprotocol")
+      .AddConstructor<DeferredRouteOutputTag> ()
+    ;
+    return tid;
+  }
+
+  TypeId  GetInstanceTypeId () const
+  {
+    return GetTypeId ();
+  }
+
+  uint16_t GetIfNeedQueue () const
+  {
+    return m_ifNeedQueue;
+  }
+  void SetIfNeedQueue (uint16_t ifNeedQueue)
+  {
+    m_ifNeedQueue = ifNeedQueue;
+  }
+
+  uint32_t GetSerializedSize () const
+  {
+    return sizeof(uint16_t);
+  }
+
+  void  Serialize (TagBuffer i) const
+  {
+    i.WriteU16 (m_ifNeedQueue);
+  }
+
+  void  Deserialize (TagBuffer i)
+  {
+    m_ifNeedQueue = i.ReadU16 ();
+  }
+
+  void  Print (std::ostream &os) const
+  {
+    os << "DeferredRouteOutputTag: if need queue = " << m_ifNeedQueue;
+  }
+
+private:
+  // 如果是因为找不到目的地，则需要放入queue；如果是因为贪婪转发失败，则不需要放入queue 
+  uint16_t m_ifNeedQueue;
+};
+
+NS_OBJECT_ENSURE_REGISTERED (DeferredRouteOutputTag);
+
 TypeId
 RoutingProtocol::GetTypeId (void)
 {
@@ -72,9 +141,16 @@ RoutingProtocol::GetTypeId (void)
                    MakeTimeChecker ())
     .AddAttribute ("EnableAdaptiveUpdate","Enables adaptive update node information. ",
                    BooleanValue (true),
-                   MakeBooleanAccessor (&RoutingProtocol::SetEnableAdaptiveUpdate,
-                                        &RoutingProtocol::GetEnableAdaptiveUpdate),
-                   MakeBooleanChecker ());            
+                   MakeBooleanAccessor (&RoutingProtocol::m_enableAdaptiveUpdate),
+                   MakeBooleanChecker ())
+    .AddAttribute ("EnableRecoveryMode","Enables use recoery mode. ",
+                   BooleanValue (false),
+                   MakeBooleanAccessor (&RoutingProtocol::m_enableRecoveryMode),
+                   MakeBooleanChecker ())   
+    .AddAttribute ("EnableQueue","Enables use queue. ",
+                   BooleanValue (true),
+                   MakeBooleanAccessor (&RoutingProtocol::m_enableQueue),
+                   MakeBooleanChecker ());         
   return tid;
 }
 
@@ -169,6 +245,11 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p,
 
   if (!p)
     {
+      DeferredRouteOutputTag tag (0);
+      if (!p->PeekPacketTag (tag))
+        {
+          p->AddPacketTag (tag);
+        }
       return LoopbackRoute (header,oif);
     }
   if (m_socketAddresses.empty ())
@@ -243,24 +324,38 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p,
         return route;
       }
       else{
-        // 没有找到合适的下一跳,符合恢复转发的条件（有目的地位置，有可转发邻居）
-        dataHeader.SetRecPosx((uint16_t)myPos.x);
-        dataHeader.SetRecPosy((uint16_t)myPos.y);
-        dataHeader.SetRecPosz((uint16_t)myPos.z);
-        dataHeader.SetInRec(1);
-        p->AddHeader(dataHeader);
-        // 恢复模式获得下一跳
-        nexthop = RecoveryMode (neighborTable);
-        Ptr<Ipv4Route> route = Create<Ipv4Route> ();
-        route->SetDestination (dst);
-        route->SetGateway (nexthop);
-        route->SetSource (m_ipv4->GetAddress (1, 0).GetLocal ());
-        route->SetOutputDevice (m_ipv4->GetNetDevice (1));  
-        return route;
+        if(m_enableRecoveryMode){
+          // 没有找到合适的下一跳,符合恢复转发的条件（有目的地位置，有可转发邻居）
+          dataHeader.SetRecPosx((uint16_t)myPos.x);
+          dataHeader.SetRecPosy((uint16_t)myPos.y);
+          dataHeader.SetRecPosz((uint16_t)myPos.z);
+          dataHeader.SetInRec(1);
+          p->AddHeader(dataHeader);
+          // 恢复模式获得下一跳
+          nexthop = RecoveryMode (neighborTable);
+          Ptr<Ipv4Route> route = Create<Ipv4Route> ();
+          route->SetDestination (dst);
+          route->SetGateway (nexthop);
+          route->SetSource (m_ipv4->GetAddress (1, 0).GetLocal ());
+          route->SetOutputDevice (m_ipv4->GetNetDevice (1));  
+          return route;
+        }else{
+          DeferredRouteOutputTag tag (0);
+          if (!p->PeekPacketTag (tag))
+            {
+              p->AddPacketTag (tag);
+            }
+          return LoopbackRoute (header,oif);
+        }
       }
     }else{
       p->AddHeader(dataHeader);
       // 没有目的地的地址/没有邻居
+      DeferredRouteOutputTag tag (1);
+      if (!p->PeekPacketTag (tag))
+        {
+          p->AddPacketTag (tag);
+        }
       return LoopbackRoute (header,oif);
     }
   }
@@ -302,8 +397,17 @@ RoutingProtocol::RouteInput (Ptr<const Packet> p,
   if (idev == m_lo)
     {
       // 加入队列
-      DeferredRouteOutput (p, header, ucb, ecb);
-      return true;
+      if(m_enableQueue){
+        DeferredRouteOutputTag tag;
+        if (p->PeekPacketTag (tag))
+        {
+          if(tag.GetIfNeedQueue() == 1){
+            DeferredRouteOutput (p, header, ucb, ecb);
+            return true;
+          }
+        }
+      }
+      return false;
     }
 
   for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j =
@@ -495,22 +599,25 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
   }
   // 如果数据包本身就是恢复模式，并且该节点到目的地的距离比进入恢复模式到目的地的距离更远，则继续恢复模式
   if(inRec == 1){
-    p->AddHeader (dataHeader);
-    if(id == icmpv4Header.GetTypeId()){
-      p->AddHeader(icmpv4Header);
+    if(m_enableRecoveryMode){
+      p->AddHeader (dataHeader);
+      if(id == icmpv4Header.GetTypeId()){
+        p->AddHeader(icmpv4Header);
+      }else{
+        p->AddHeader(udpHeader);
+      }
+      // 恢复模式
+      Ipv4Address nextHop = RecoveryMode (neighborTable);
+      Ptr<Ipv4Route> route = Create<Ipv4Route> ();
+      route->SetDestination (dst);
+      route->SetSource (header.GetSource ());
+      route->SetGateway (nextHop);
+      route->SetOutputDevice (m_ipv4->GetNetDevice (1)); 
+      ucb (route, p, header); 
+      return true;
     }else{
-      p->AddHeader(udpHeader);
+      return false;
     }
-    // 恢复模式
-    Ipv4Address nextHop = RecoveryMode (neighborTable);
-    Ptr<Ipv4Route> route = Create<Ipv4Route> ();
-    route->SetDestination (dst);
-    route->SetSource (header.GetSource ());
-    route->SetGateway (nextHop);
-    route->SetOutputDevice (m_ipv4->GetNetDevice (1)); 
-    ucb (route, p, header); 
-    return true;
-    // return false;
   }else{     //贪婪模式
     Ipv4Address nextHop = m_routingTable.BestNeighbor (neighborTable, predictDst, myPos);
     if (nextHop != Ipv4Address::GetZero ())
@@ -529,27 +636,30 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
       ucb (route, p, header);
       return true;
     }else{       // 如果贪婪转发没有找到合适的下一跳
-      inRec = 1;
-      dataHeader.SetInRec(1);
-      dataHeader.SetRecPosx ((uint16_t)myPos.x);
-      dataHeader.SetRecPosy ((uint16_t)myPos.y); 
-      dataHeader.SetRecPosz ((uint16_t)myPos.z);
-      p->AddHeader (dataHeader);
-      if(id == icmpv4Header.GetTypeId()){
-        p->AddHeader(icmpv4Header);
+      if(m_enableRecoveryMode){
+        inRec = 1;
+        dataHeader.SetInRec(1);
+        dataHeader.SetRecPosx ((uint16_t)myPos.x);
+        dataHeader.SetRecPosy ((uint16_t)myPos.y); 
+        dataHeader.SetRecPosz ((uint16_t)myPos.z);
+        p->AddHeader (dataHeader);
+        if(id == icmpv4Header.GetTypeId()){
+          p->AddHeader(icmpv4Header);
+        }else{
+          p->AddHeader(udpHeader);
+        }
+        // 恢复模式
+        nextHop = RecoveryMode (neighborTable);
+        Ptr<Ipv4Route> route = Create<Ipv4Route> ();
+        route->SetDestination (dst);
+        route->SetSource (header.GetSource ());
+        route->SetGateway (nextHop);
+        route->SetOutputDevice (m_ipv4->GetNetDevice (1));  
+        ucb (route, p, header);
+        return true;
       }else{
-        p->AddHeader(udpHeader);
-      }
-      // 恢复模式
-      nextHop = RecoveryMode (neighborTable);
-      Ptr<Ipv4Route> route = Create<Ipv4Route> ();
-      route->SetDestination (dst);
-      route->SetSource (header.GetSource ());
-      route->SetGateway (nextHop);
-      route->SetOutputDevice (m_ipv4->GetNetDevice (1));  
-      ucb (route, p, header);
-      return true;
-      // return false;
+        return false;
+      }     
     }
   }
 }
@@ -678,16 +788,20 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
       route->SetOutputDevice (m_ipv4->GetNetDevice (1));
     }
     else{
-      dataHeader.SetRecPosx((uint16_t)myPos.x);
-      dataHeader.SetRecPosy((uint16_t)myPos.y);
-      dataHeader.SetRecPosz((uint16_t)myPos.z);
-      dataHeader.SetInRec(1);
-      // 恢复模式获得下一跳
-      Ipv4Address nexthop = RecoveryMode (neighborTable);
-      route->SetDestination (myprotocolHeader.GetMyadress());
-      route->SetGateway (nexthop);
-      route->SetSource (m_ipv4->GetAddress (1, 0).GetLocal ()); 
-      route->SetOutputDevice (m_ipv4->GetNetDevice (1));  
+      if(m_enableRecoveryMode){
+        dataHeader.SetRecPosx((uint16_t)myPos.x);
+        dataHeader.SetRecPosy((uint16_t)myPos.y);
+        dataHeader.SetRecPosz((uint16_t)myPos.z);
+        dataHeader.SetInRec(1);
+        // 恢复模式获得下一跳
+        Ipv4Address nexthop = RecoveryMode (neighborTable);
+        route->SetDestination (myprotocolHeader.GetMyadress());
+        route->SetGateway (nexthop);
+        route->SetSource (m_ipv4->GetAddress (1, 0).GetLocal ()); 
+        route->SetOutputDevice (m_ipv4->GetNetDevice (1)); 
+      }else{
+        return;
+      } 
     }
     SendPacketFromQueue(myprotocolHeader.GetMyadress(), route, dataHeader);
   }

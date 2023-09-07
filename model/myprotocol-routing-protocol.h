@@ -79,14 +79,6 @@ public:
   virtual void
   DoDispose ();
 
-  // ADD：
-  void SetEnableAdaptiveUpdate (bool f){
-    m_enableAdaptiveUpdate = f;
-  }
-  bool GetEnableAdaptiveUpdate () const{
-    return m_enableAdaptiveUpdate;
-  }
-
   // From Ipv4RoutingProtocol
   Ptr<Ipv4Route> RouteOutput (Ptr<Packet> p, const Ipv4Header &header, Ptr<NetDevice> oif, Socket::SocketErrno &sockerr);
   /**
@@ -138,6 +130,10 @@ private:
 
   // ADD:是否启用自适应更新
   bool m_enableAdaptiveUpdate;
+  // ADD:是否使用恢复策略
+  bool m_enableRecoveryMode;
+  // ADD:是都使用queue
+  bool m_enableQueue;
   // ADD: 检查改变的时间周期  
   Time m_checkChangeInterval;   //检查改变的时间周期  
 
@@ -151,8 +147,6 @@ private:
   Ptr<NetDevice> m_lo;
   /// Main Routing table for the node
   RoutingTable m_routingTable;
-  /// Flag that is used to enable or disable buffering
-  bool EnableBuffering;
   /// Unicast callback for own packets
   UnicastForwardCallback m_scb;
   /// Error callback for own packets
