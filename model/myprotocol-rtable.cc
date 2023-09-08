@@ -65,7 +65,7 @@ RoutingTableEntry::~RoutingTableEntry ()
 RoutingTable::RoutingTable ()
 {
   // 每个表项的有效生存时间为maxIntervalTime
-  m_entryLifeTime = 20;
+  m_entryLifeTime = 30;
 }
 
 bool

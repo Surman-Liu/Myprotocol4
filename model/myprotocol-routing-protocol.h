@@ -179,6 +179,10 @@ private:
   Time m_maxQueueTime;
   // ADD:queue
   RequestQueue m_queue;
+  // ADD:节点的通信范围
+  uint16_t m_transRange;
+  // ADD：扩大范围因子
+  float m_scaleFactor;
 
 private:
   /// Start protocol operation

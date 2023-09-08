@@ -144,7 +144,7 @@ RoutingProtocol::GetTypeId (void)
                    MakeBooleanAccessor (&RoutingProtocol::m_enableAdaptiveUpdate),
                    MakeBooleanChecker ())
     .AddAttribute ("EnableRecoveryMode","Enables use recoery mode. ",
-                   BooleanValue (false),
+                   BooleanValue (true),
                    MakeBooleanAccessor (&RoutingProtocol::m_enableRecoveryMode),
                    MakeBooleanChecker ())   
     .AddAttribute ("EnableQueue","Enables use queue. ",
@@ -173,11 +173,13 @@ RoutingProtocol::RoutingProtocol ()
     m_pathDiscoveryTime ( Time (2 * m_netTraversalTime)),
     m_lastSendTime(0),
     m_ifChangeLastTime(false),
-    m_maxIntervalTime(20),
+    m_maxIntervalTime(30),
     m_idCache(m_pathDiscoveryTime),            // 每个生命周期是2.4s
     m_maxQueueLen (64),
     m_maxQueueTime (Seconds (30)),
     m_queue (m_maxQueueLen, m_maxQueueTime),
+    m_transRange(250),
+    m_scaleFactor(1.5),
     m_periodicUpdateTimer (Timer::CANCEL_ON_DESTROY),
     m_checkChangeTimer(Timer::CANCEL_ON_DESTROY)
 {
@@ -230,8 +232,9 @@ RoutingProtocol::Start ()
   }else{
     SendPeriodicUpdate();
     m_checkChangeTimer.SetFunction (&RoutingProtocol::CheckChange,this);
-    m_checkChangeTimer.Schedule (MicroSeconds (m_uniformRandomVariable->GetInteger (0,1000)));
+    m_checkChangeTimer.Schedule (MilliSeconds (m_uniformRandomVariable->GetInteger (1000,2000)));
   }
+  // MilliSeconds
 }
 
 // 既可以转发控制包，也可以转发数据包，但是都是自己发出的
@@ -887,11 +890,15 @@ RoutingProtocol::CheckChange ()
   float recordDeltaSpeed = fabs(information.speed - m_recordInformation.speed);
   float recordDeltaThetaXY = fabs(information.thetaXY - m_recordInformation.thetaXY);
   float recordDeltaThetaZ = fabs(information.thetaZ - m_recordInformation.thetaZ);
-  // 将角度阈值变成弧度
-  float thetaThreshold = m_thetaThreshold * M_PI / 180;
-  // 变化超出阈值，重新发送更新控制包
+  // 计算角度和速度阈值
+  uint16_t t = Simulator::Now ().ToInteger(Time::S) - m_lastSendTime;
+  float tanTheta = m_transRange * m_scaleFactor / (t * m_recordInformation.speed);
+  float thetaThreshold = atan(tanTheta);
+  float speedThreshold = m_transRange * m_scaleFactor / t;
+  // float thetaThreshold = m_thetaThreshold * M_PI / 180;
+
   // 1. 超出阈值就更新
-  if(recordDeltaSpeed > m_speedThreshold || recordDeltaThetaXY > thetaThreshold || recordDeltaThetaZ > thetaThreshold){
+  if(recordDeltaSpeed > speedThreshold || recordDeltaThetaXY > thetaThreshold || recordDeltaThetaZ > thetaThreshold){
     // 将本次更新的速度、方向记录
     m_recordInformation = information;
     SendPeriodicUpdate();
