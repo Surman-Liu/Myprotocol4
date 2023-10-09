@@ -25,8 +25,8 @@
  * Authors: Elena Buchatskaia <borovkovaes@iitp.ru>
  *          Pavel Boyko <boyko@iitp.ru>
  */
-#ifndef MYPROTOCOL_RQUEUE_H
-#define MYPROTOCOL_RQUEUE_H
+#ifndef MYPROTOCOL4_RQUEUE_H
+#define MYPROTOCOL4_RQUEUE_H
 
 #include <vector>
 #include "ns3/ipv4-routing-protocol.h"
@@ -34,7 +34,7 @@
 
 
 namespace ns3 {
-namespace myprotocol {
+namespace myprotocol4 {
 
 /**
  * \ingroup aodv

@@ -30,13 +30,13 @@
  * US Department of Defense (DoD), and ITTC at The University of Kansas.
  */
 
-#ifndef MYPROTOCOL_ROUTING_PROTOCOL_H
-#define MYPROTOCOL_ROUTING_PROTOCOL_H
+#ifndef MYPROTOCOL4_ROUTING_PROTOCOL_H
+#define MYPROTOCOL4_ROUTING_PROTOCOL_H
 
-#include "myprotocol-rtable.h"
-#include "myprotocol-packet.h"
-#include "myprotocol-id-cache.h"
-#include "myprotocol-rqueue.h"
+#include "myprotocol4-rtable.h"
+#include "myprotocol4-packet.h"
+#include "myprotocol4-id-cache.h"
+#include "myprotocol4-rqueue.h"
 #include "ns3/node.h"
 #include "ns3/random-variable-stream.h"
 #include "ns3/ipv4-routing-protocol.h"
@@ -48,7 +48,7 @@
 #include<cmath>
 
 namespace ns3 {
-namespace myprotocol {
+namespace myprotocol4 {
 
 // ADD:无人机运动的信息
 struct Information

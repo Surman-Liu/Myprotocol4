@@ -25,7 +25,7 @@
  * Authors: Elena Buchatskaia <borovkovaes@iitp.ru>
  *          Pavel Boyko <boyko@iitp.ru>
  */
-#include "myprotocol-rqueue.h"
+#include "myprotocol4-rqueue.h"
 #include <algorithm>
 #include <functional>
 #include "ns3/ipv4-route.h"
@@ -34,9 +34,9 @@
 
 namespace ns3 {
 
-NS_LOG_COMPONENT_DEFINE ("MyprotocolQueue");
+NS_LOG_COMPONENT_DEFINE ("Myprotocol4Queue");
 
-namespace myprotocol {
+namespace myprotocol4 {
 uint32_t
 RequestQueue::GetSize ()
 {

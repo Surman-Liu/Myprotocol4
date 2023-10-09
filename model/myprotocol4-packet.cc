@@ -28,12 +28,12 @@
  * NSF grant CNS-1050226 (Multilayer Network Resilience Analysis and Experimentation on GENI),
  * US Department of Defense (DoD), and ITTC at The University of Kansas.
  */
-#include "myprotocol-packet.h"
+#include "myprotocol4-packet.h"
 #include "ns3/address-utils.h"
 #include "ns3/packet.h"
 
 namespace ns3 {
-namespace myprotocol {
+namespace myprotocol4 {
 
 NS_OBJECT_ENSURE_REGISTERED (MyprotocolHeader);
 
@@ -58,9 +58,9 @@ MyprotocolHeader::~MyprotocolHeader ()
 TypeId
 MyprotocolHeader::GetTypeId (void)
 {
-  static TypeId tid = TypeId ("ns3::myprotocol::MyprotocolHeader")
+  static TypeId tid = TypeId ("ns3::myprotocol4::MyprotocolHeader")
     .SetParent<Header> ()
-    .SetGroupName ("Myprotocol")
+    .SetGroupName ("Myprotocol4")
     .AddConstructor<MyprotocolHeader> ();
   return tid;
 }
@@ -158,7 +158,7 @@ DataHeader::DataHeader (uint16_t dstPosx, uint16_t dstPosy, uint16_t dstPosz,
 TypeId
 DataHeader::GetTypeId ()
 {
-  static TypeId tid = TypeId ("ns3::myprotocol::DataHeader")
+  static TypeId tid = TypeId ("ns3::myprotocol4::DataHeader")
     .SetParent<Header> ()
     .AddConstructor<DataHeader> ()
   ;

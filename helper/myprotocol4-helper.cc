@@ -28,53 +28,40 @@
  * NSF grant CNS-1050226 (Multilayer Network Resilience Analysis and Experimentation on GENI),
  * US Department of Defense (DoD), and ITTC at The University of Kansas.
  */
-
-#ifndef MYPROTOCOL_HELPER_H
-#define MYPROTOCOL_HELPER_H
-
-#include "ns3/object-factory.h"
-#include "ns3/node.h"
-#include "ns3/node-container.h"
-#include "ns3/ipv4-routing-helper.h"
+#include "myprotocol4-helper.h"
+#include "ns3/myprotocol4-routing-protocol.h"
+#include "ns3/node-list.h"
+#include "ns3/names.h"
+#include "ns3/ipv4-list-routing.h"
 
 namespace ns3 {
-/**
- * \ingroup myprotocol
- * \brief Helper class that adds myprotocol routing to nodes.
- */
-class MyprotocolHelper : public Ipv4RoutingHelper
+Myprotocol4Helper::~Myprotocol4Helper ()
 {
-public:
-  MyprotocolHelper ();
-  ~MyprotocolHelper ();
-  /**
-   * \returns pointer to clone of this MyprotocolHelper
-   *
-   * This method is mainly for internal use by the other helpers;
-   * clients are expected to free the dynamic memory allocated by this method
-   */
-  MyprotocolHelper* Copy (void) const;
-
-  /**
-   * \param node the node on which the routing protocol will run
-   * \returns a newly-created routing protocol
-   *
-   * This method will be called by ns3::InternetStackHelper::Install
-   *
-   */
-  virtual Ptr<Ipv4RoutingProtocol> Create (Ptr<Node> node) const;
-  /**
-   * \param name the name of the attribute to set
-   * \param value the value of the attribute to set.
-   *
-   * This method controls the attributes of ns3::myprotocol::RoutingProtocol
-   */
-  void Set (std::string name, const AttributeValue &value);
-
-private:
-  ObjectFactory m_agentFactory; //!< Object factory
-};
-
 }
 
-#endif /* MYPROTOCOL_HELPER_H */
+Myprotocol4Helper::Myprotocol4Helper () : Ipv4RoutingHelper ()
+{
+  m_agentFactory.SetTypeId ("ns3::myprotocol4::RoutingProtocol");
+}
+
+Myprotocol4Helper*
+Myprotocol4Helper::Copy (void) const
+{
+  return new Myprotocol4Helper (*this);
+}
+
+Ptr<Ipv4RoutingProtocol>
+Myprotocol4Helper::Create (Ptr<Node> node) const
+{
+  Ptr<myprotocol4::RoutingProtocol> agent = m_agentFactory.Create<myprotocol4::RoutingProtocol> ();
+  node->AggregateObject (agent);
+  return agent;
+}
+
+void
+Myprotocol4Helper::Set (std::string name, const AttributeValue &value)
+{
+  m_agentFactory.Set (name, value);
+}
+
+}

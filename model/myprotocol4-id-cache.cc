@@ -15,11 +15,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#include "myprotocol-id-cache.h"
+#include "myprotocol4-id-cache.h"
 #include <algorithm>
 
 namespace ns3 {
-namespace myprotocol {
+namespace myprotocol4 {
 bool
 IdCache::IsDuplicate (Ipv4Address addr, uint16_t timestamp)
 {

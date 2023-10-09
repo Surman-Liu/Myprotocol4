@@ -1,15 +1,15 @@
 ## -*- Mode: python; py-indent-offset: 4; indent-tabs-mode: nil; coding: utf-8; -*-
 
 def build(bld):
-    module = bld.create_ns3_module('myprotocol', ['internet'])
+    module = bld.create_ns3_module('myprotocol4', ['internet'])
     module.includes = '.'
     module.source = [
-        'model/myprotocol-rtable.cc',
-        'model/myprotocol-packet.cc',
-        'model/myprotocol-routing-protocol.cc',
-        'model/myprotocol-id-cache.cc',
-        'model/myprotocol-rqueue.cc',
-        'helper/myprotocol-helper.cc'
+        'model/myprotocol4-rtable.cc',
+        'model/myprotocol4-packet.cc',
+        'model/myprotocol4-routing-protocol.cc',
+        'model/myprotocol4-id-cache.cc',
+        'model/myprotocol4-rqueue.cc',
+        'helper/myprotocol4-helper.cc'
         ]
 
     # module_test = bld.create_ns3_module_test_library('myprotocol')
@@ -18,14 +18,14 @@ def build(bld):
     #     ]
 
     headers = bld(features='ns3header')
-    headers.module = 'myprotocol'
+    headers.module = 'myprotocol4'
     headers.source = [
-        'model/myprotocol-rtable.h',
-        'model/myprotocol-packet.h',
-        'model/myprotocol-routing-protocol.h',
-        'model/myprotocol-id-cache.h',
-        'model/myprotocol-rqueue.h',
-        'helper/myprotocol-helper.h',
+        'model/myprotocol4-rtable.h',
+        'model/myprotocol4-packet.h',
+        'model/myprotocol4-routing-protocol.h',
+        'model/myprotocol4-id-cache.h',
+        'model/myprotocol4-rqueue.h',
+        'helper/myprotocol4-helper.h',
         ]
     if (bld.env['ENABLE_EXAMPLES']):
       bld.recurse('examples')

@@ -28,17 +28,17 @@
  * NSF grant CNS-1050226 (Multilayer Network Resilience Analysis and Experimentation on GENI),
  * US Department of Defense (DoD), and ITTC at The University of Kansas.
  */
-#include "myprotocol-rtable.h"
+#include "myprotocol4-rtable.h"
 #include "ns3/simulator.h"
 #include <iomanip>
 #include "ns3/log.h"
 
 namespace ns3 {
 
-NS_LOG_COMPONENT_DEFINE ("MyprotocolRoutingTable");
+NS_LOG_COMPONENT_DEFINE ("Myprotocol4RoutingTable");
 
 // ADD:修改构造函数中的参数
-namespace myprotocol {
+namespace myprotocol4 {
 RoutingTableEntry::RoutingTableEntry (uint16_t x,
                                       uint16_t y,
                                       uint16_t z,

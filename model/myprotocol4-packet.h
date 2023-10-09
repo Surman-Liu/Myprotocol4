@@ -29,8 +29,8 @@
  * US Department of Defense (DoD), and ITTC at The University of Kansas.
  */
 
-#ifndef MYPROTOCOL_PACKET_H
-#define MYPROTOCOL_PACKET_H
+#ifndef MYPROTOCOL4_PACKET_H
+#define MYPROTOCOL4_PACKET_H
 
 #include <iostream>
 #include "ns3/header.h"
@@ -38,7 +38,7 @@
 #include "ns3/nstime.h"
 
 namespace ns3 {
-namespace myprotocol {
+namespace myprotocol4 {
 /**
  * \ingroup myprotocol
  * \brief myprotocol Update Packet Format

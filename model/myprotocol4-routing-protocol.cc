@@ -30,7 +30,7 @@
  * US Department of Defense (DoD), and ITTC at The University of Kansas.
  */
 
-#include "myprotocol-routing-protocol.h"
+#include "myprotocol4-routing-protocol.h"
 #include "ns3/log.h"
 #include "ns3/inet-socket-address.h"
 #include "ns3/trace-source-accessor.h"
@@ -46,9 +46,9 @@
 
 namespace ns3 {
 
-NS_LOG_COMPONENT_DEFINE ("MyprotocolRoutingProtocol");
+NS_LOG_COMPONENT_DEFINE ("Myprotocol4RoutingProtocol");
 
-namespace myprotocol {
+namespace myprotocol4 {
 
 NS_OBJECT_ENSURE_REGISTERED (RoutingProtocol);
 
@@ -75,9 +75,9 @@ public:
    */
   static TypeId GetTypeId ()
   {
-    static TypeId tid = TypeId ("ns3::myprotocol::DeferredRouteOutputTag")
+    static TypeId tid = TypeId ("ns3::myprotocol4::DeferredRouteOutputTag")
       .SetParent<Tag> ()
-      .SetGroupName ("Myprotocol")
+      .SetGroupName ("Myprotocol4")
       .AddConstructor<DeferredRouteOutputTag> ()
     ;
     return tid;
@@ -127,9 +127,9 @@ NS_OBJECT_ENSURE_REGISTERED (DeferredRouteOutputTag);
 TypeId
 RoutingProtocol::GetTypeId (void)
 {
-  static TypeId tid = TypeId ("ns3::myprotocol::RoutingProtocol")
+  static TypeId tid = TypeId ("ns3::myprotocol4::RoutingProtocol")
     .SetParent<Ipv4RoutingProtocol> ()
-    .SetGroupName ("Myprotocol")
+    .SetGroupName ("Myprotocol4")
     .AddConstructor<RoutingProtocol> ()
     .AddAttribute ("PeriodicUpdateInterval","Periodic interval between exchange of full routing tables among nodes. ",
                    TimeValue (Seconds (10)),

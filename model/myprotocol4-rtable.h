@@ -29,8 +29,8 @@
  * US Department of Defense (DoD), and ITTC at The University of Kansas.
  */
 
-#ifndef MYPROTOCOL_RTABLE_H
-#define MYPROTOCOL_RTABLE_H
+#ifndef MYPROTOCOL4_RTABLE_H
+#define MYPROTOCOL4_RTABLE_H
 
 #include <cassert>
 #include <map>
@@ -46,7 +46,7 @@
 #include "ns3/mobility-model.h"
 
 namespace ns3 {
-namespace myprotocol {
+namespace myprotocol4 {
 
 /**
  * \ingroup myprotocol

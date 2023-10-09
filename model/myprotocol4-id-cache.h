@@ -17,15 +17,15 @@
  *
  */
 
-#ifndef MYPROTOCOL_ID_CACHE_H
-#define MYPROTOCOL_ID_CACHE_H
+#ifndef MYPROTOCOL4_ID_CACHE_H
+#define MYPROTOCOL4_ID_CACHE_H
 
 #include "ns3/ipv4-address.h"
 #include "ns3/simulator.h"
 #include <vector>
 
 namespace ns3 {
-namespace myprotocol {
+namespace myprotocol4 {
 /**
  * \ingroup myprotocol
  *
