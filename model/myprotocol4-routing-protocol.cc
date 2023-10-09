@@ -165,30 +165,23 @@ RoutingProtocol::AssignStreams (int64_t stream)
 // ADD：在此处初始化与id-cache相关的变量
 RoutingProtocol::RoutingProtocol ()
   : m_routingTable (),
-    m_thetaThreshold(15),         //角度变化超过10度发送更新
-    m_speedThreshold(15),         //速度变化超过10m/s发送更新
     m_netDiameter (15),                                    //最大跳数，1000*根号二/250m = 6hops
     m_nodeTraversalTime (MilliSeconds (40)),               //一跳的传播速度，250m / 299792458m/s = 
     m_netTraversalTime (Time ((2 * m_netDiameter) * m_nodeTraversalTime)),
     m_pathDiscoveryTime ( Time (2 * m_netTraversalTime)),
     m_lastSendTime(0),
-    m_ifChangeLastTime(false),
+    m_lastSendPos(Vector(0,0,0)),
+    m_lastSendVelocity(Vector(0,0,0)),
     m_maxIntervalTime(30),
     m_idCache(m_pathDiscoveryTime),            // 每个生命周期是2.4s
     m_maxQueueLen (64),
     m_maxQueueTime (Seconds (30)),
     m_queue (m_maxQueueLen, m_maxQueueTime),
     m_transRange(250),
-    m_scaleFactor(1.5),
+    m_scaleFactor(1),
     m_periodicUpdateTimer (Timer::CANCEL_ON_DESTROY),
     m_checkChangeTimer(Timer::CANCEL_ON_DESTROY)
 {
-  m_recordInformation.speed = 0;
-  m_recordInformation.thetaXY = 0;
-  m_recordInformation.thetaZ = 0;
-  m_sendInformation.speed = 0;
-  m_sendInformation.thetaXY = 0;
-  m_sendInformation.thetaZ = 0;
   m_uniformRandomVariable = CreateObject<UniformRandomVariable> ();
 }
 
@@ -829,108 +822,37 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
   }
 }
 
-// ADD: 计算运动信息
-void
-RoutingProtocol::CalculateInformation (struct Information &information){
-  Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
-  Vector myVel = MM->GetVelocity();
-  int16_t vx = (int16_t)myVel.x;
-  int16_t vy = (int16_t)myVel.y;
-  int16_t vz = (int16_t)myVel.z;
-
-  // speed
-  information.speed = sqrt(vx*vx + vy*vy + vz*vz);
-  // thetaXY，[0,2π]
-  if(vx == 0){
-    if(vy == 0){
-      information.thetaXY = 0;
-    }else if(vy > 0){
-      information.thetaXY = M_PI / 2;
-    }else{
-      information.thetaXY = M_PI * 3 / 2;
-    }
-  }else if(vx > 0){
-    if(vy == 0){
-      information.thetaXY = 0;
-    }else if(vy > 0){
-      information.thetaXY = atan(vy / vx);
-    }else{
-      information.thetaXY = 2 * M_PI + atan(vy / vx);
-    }
-  }else{
-    if(vy == 0){
-      information.thetaXY = M_PI;
-    }else{
-      information.thetaXY = M_PI + atan(vy / vx);
-    }
-  }
-  // thetaZ，[π/2,-π/2]
-  float vxy = sqrt(vx*vx + vy*vy);
-  if(vxy == 0){
-    if(vz > 0){
-      information.thetaZ = M_PI / 2;
-    }else if(vz < 0){
-      information.thetaZ = - M_PI / 2;
-    }else{
-      information.thetaZ = 0;
-    }
-  }else{
-    information.thetaZ = atan(vz / vxy);
-  }
-}
-
 // ADD：定期检查速度、方向变化
 void
 RoutingProtocol::CheckChange ()
 {
-  struct Information information;
-  // 计算当前信息
-  CalculateInformation(information);
-  // 计算差值
-  float recordDeltaSpeed = fabs(information.speed - m_recordInformation.speed);
-  float recordDeltaThetaXY = fabs(information.thetaXY - m_recordInformation.thetaXY);
-  float recordDeltaThetaZ = fabs(information.thetaZ - m_recordInformation.thetaZ);
-  // 计算角度和速度阈值
+  // 使用现在的位置信息来预测节点下一秒在的位置
+  Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
+  Vector myPos = MM->GetPosition();
+  Vector myVel = MM->GetVelocity();
+  Vector NextTimeMobilityPos;
+  NextTimeMobilityPos.x = myPos.x + myVel.x;
+  NextTimeMobilityPos.y = myPos.y + myVel.y;
+  NextTimeMobilityPos.z = myPos.z + myVel.z;
+
+  // 使用上次更新的位置信息来预测节点下一秒在的位置
   uint16_t t = Simulator::Now ().ToInteger(Time::S) - m_lastSendTime;
-  float tanTheta = m_transRange * m_scaleFactor / (t * m_recordInformation.speed);
-  float thetaThreshold = atan(tanTheta);
-  float speedThreshold = m_transRange * m_scaleFactor / t;
-  // float thetaThreshold = m_thetaThreshold * M_PI / 180;
+  Vector NextTimeTablePos;
+  NextTimeTablePos.x = m_lastSendPos.x + m_lastSendVelocity.x * (t + 1);
+  NextTimeTablePos.y = m_lastSendPos.y + m_lastSendVelocity.y * (t + 1);
+  NextTimeTablePos.z = m_lastSendPos.z + m_lastSendVelocity.z * (t + 1);
+  
+  double distance = CalculateDistance(NextTimeMobilityPos, NextTimeTablePos);
 
   // 1. 超出阈值就更新
-  if(recordDeltaSpeed > speedThreshold || recordDeltaThetaXY > thetaThreshold || recordDeltaThetaZ > thetaThreshold){
+  if(distance > m_transRange * m_scaleFactor){
     // 将本次更新的速度、方向记录
-    m_recordInformation = information;
     SendPeriodicUpdate();
   }
   // 如果超过最大间隔时间没有发送更新包，则发送
   if(Simulator::Now ().ToInteger(Time::S) - m_lastSendTime > m_maxIntervalTime){
-    m_recordInformation = information;
     SendPeriodicUpdate();
   }
-  // 2. 连续变化不更新
-  // if(recordDeltaSpeed > m_speedThreshold || recordDeltaThetaXY > thetaThreshold || recordDeltaThetaZ > thetaThreshold){
-  //   // 将本次更新的速度、方向记录
-  //   m_recordInformation = information;
-  //   // 如果不是连续时间
-  //   if(m_ifChangeLastTime == false){
-  //     SendPeriodicUpdate();
-  //     m_sendInformation = information;
-  //   }
-  //   m_ifChangeLastTime = true;
-  // }else{
-  //   m_ifChangeLastTime = false;
-  //   // case：如果信息经过了连续变化终于趋向稳定，但是平静后的第一次检测却没有超过阈值，则不能及时发送最新的位置
-  //   float sendDeltaSpeed = fabs(information.speed - m_sendInformation.speed);
-  //   float sendDeltaThetaXY = fabs(information.thetaXY - m_sendInformation.thetaXY);
-  //   float sendDeltaThetaZ = fabs(information.thetaZ - m_sendInformation.thetaZ);
-  //   if(sendDeltaSpeed > m_speedThreshold || sendDeltaThetaXY > thetaThreshold || sendDeltaThetaZ > thetaThreshold){
-  //     // 虽然是false，但是已经很久没有发送新的控制包了，说明经过了连续变化，但是这不算true
-  //     SendPeriodicUpdate();
-  //     m_recordInformation = information;
-  //     m_sendInformation = information;
-  //   }
-  // }
   m_checkChangeTimer.Schedule (m_checkChangeInterval + MicroSeconds (25 * m_uniformRandomVariable->GetInteger (0,1000)));
 }
 
@@ -938,11 +860,15 @@ RoutingProtocol::CheckChange ()
 void
 RoutingProtocol::SendPeriodicUpdate ()
 { 
-  m_lastSendTime = Simulator::Now ().ToInteger(Time::S);
-
   Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
   Vector myPos = MM->GetPosition();
   Vector myVel = MM->GetVelocity();
+
+  // 记录下本次更新的信息
+  m_lastSendTime = Simulator::Now ().ToInteger(Time::S);
+  m_lastSendPos = myPos;
+  m_lastSendVelocity = myVel;
+
   int16_t vx = (int16_t)myVel.x;
   int16_t vy = (int16_t)myVel.y;
   int16_t vz = (int16_t)myVel.z;

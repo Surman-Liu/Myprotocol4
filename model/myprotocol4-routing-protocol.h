@@ -50,14 +50,6 @@
 namespace ns3 {
 namespace myprotocol4 {
 
-// ADD:无人机运动的信息
-struct Information
-{
-  float speed;
-  float thetaXY;
-  float thetaZ;
-};
-
 /**
  * \ingroup myprotocol
  * \brief myprotocol routing protocol.
@@ -152,12 +144,6 @@ private:
   /// Error callback for own packets
   ErrorCallback m_ecb;
 
-  // ADD：记录上次控制包中的方向和速度
-  struct Information m_recordInformation;
-  struct Information m_sendInformation;
-  uint16_t m_thetaThreshold;    //方向改变阈值
-  uint16_t m_speedThreshold;    //速度改变阈值
-
   // ADD：初始化id-cache需要的相关时间变量
   uint32_t m_netDiameter;             ///< Net diameter measures the maximum possible number of hops between two nodes in the network
   /**
@@ -169,7 +155,8 @@ private:
   Time m_pathDiscoveryTime;            ///< Estimate of maximum time needed to find route in network.
 
   uint16_t m_lastSendTime;        //上次发送更新包的时间
-  bool m_ifChangeLastTime;    //在上一次检查中是否发送了更新包
+  Vector m_lastSendPos;
+  Vector m_lastSendVelocity;
   uint16_t m_maxIntervalTime;    //最大不发送更新包的时间间隔
 
   // ADD:id-cache
@@ -236,10 +223,6 @@ private:
   // ADD:定期检查速度、方向的变化
   void
   CheckChange ();
-
-  // ADD: 计算运动信息
-  void
-  CalculateInformation (struct Information &information);
 
   // ADD:转换速度符号的两个函数。sign：记录速度是否为负数，0:都不是负数，1:X轴速度为负，2:Y轴速度为负，3:Z轴速度为负,4：xy为负数，5：xz为负数，6：yz为负数，7：全部都是负数
   Vector GetRightVelocity(uint16_t vx, uint16_t vy, uint16_t vz, uint16_t sign);
