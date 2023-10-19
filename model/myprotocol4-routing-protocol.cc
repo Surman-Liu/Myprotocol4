@@ -27,20 +27,12 @@ class DeferredRouteOutputTag : public Tag
 {
 
 public:
-  /**
-   * \brief Constructor
-   * \param o the output interface
-   */
   DeferredRouteOutputTag (uint16_t ifNeedQueue = 0) 
     : Tag (),
       m_ifNeedQueue (ifNeedQueue)
   {
   }
 
-  /**
-   * \brief Get the type ID.
-   * \return the object TypeId
-   */
   static TypeId GetTypeId ()
   {
     static TypeId tid = TypeId ("ns3::myprotocol4::DeferredRouteOutputTag")
@@ -86,7 +78,7 @@ public:
   }
 
 private:
-  // 如果是因为找不到目的地，则需要放入queue；如果是因为贪婪转发失败，则不需要放入queue 
+  // 如果是因为找不到目的地，则需要放入queue
   uint16_t m_ifNeedQueue;
 };
 
@@ -99,18 +91,10 @@ RoutingProtocol::GetTypeId (void)
     .SetParent<Ipv4RoutingProtocol> ()
     .SetGroupName ("Myprotocol4")
     .AddConstructor<RoutingProtocol> ()
-    .AddAttribute ("PeriodicUpdateInterval","Periodic interval between exchange of full routing tables among nodes. ",
-                   TimeValue (Seconds (10)),
-                   MakeTimeAccessor (&RoutingProtocol::m_periodicUpdateInterval),
-                   MakeTimeChecker ())
     .AddAttribute ("CheckChangeInterval","Check interval between compare speed and thata with thire threshold. ",
                    TimeValue (Seconds (1)),
                    MakeTimeAccessor (&RoutingProtocol::m_checkChangeInterval),
                    MakeTimeChecker ())
-    .AddAttribute ("EnableAdaptiveUpdate","Enables adaptive update node information. ",
-                   BooleanValue (true),
-                   MakeBooleanAccessor (&RoutingProtocol::m_enableAdaptiveUpdate),
-                   MakeBooleanChecker ())
     .AddAttribute ("EnableRecoveryMode","Enables use recoery mode. ",
                    BooleanValue (true),
                    MakeBooleanAccessor (&RoutingProtocol::m_enableRecoveryMode),
@@ -147,7 +131,6 @@ RoutingProtocol::RoutingProtocol ()
     m_queue (m_maxQueueLen, m_maxQueueTime),
     m_transRange(250),
     m_scaleFactor(1),
-    m_periodicUpdateTimer (Timer::CANCEL_ON_DESTROY),
     m_checkChangeTimer(Timer::CANCEL_ON_DESTROY)
 {
   m_uniformRandomVariable = CreateObject<UniformRandomVariable> ();
@@ -187,15 +170,10 @@ RoutingProtocol::Start ()
 {
   m_scb = MakeCallback (&RoutingProtocol::Send,this);
   m_ecb = MakeCallback (&RoutingProtocol::Drop,this);
-  if(!m_enableAdaptiveUpdate){
-    m_periodicUpdateTimer.SetFunction (&RoutingProtocol::SendPeriodicUpdate,this);
-    m_periodicUpdateTimer.Schedule (MicroSeconds (m_uniformRandomVariable->GetInteger (0,1000)));
-  }else{
-    SendPeriodicUpdate();
-    m_checkChangeTimer.SetFunction (&RoutingProtocol::CheckChange,this);
-    m_checkChangeTimer.Schedule (MilliSeconds (m_uniformRandomVariable->GetInteger (1000,2000)));
-  }
-  // MilliSeconds
+  SendUpdate();
+  m_checkChangeTimer.SetFunction (&RoutingProtocol::CheckChange,this);
+  m_checkChangeTimer.Schedule (MilliSeconds (m_uniformRandomVariable->GetInteger (1000,2000)));
+
 }
 
 // 既可以转发控制包，也可以转发数据包，但是都是自己发出的
@@ -253,9 +231,10 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p,
     dataHeader.SetUid(p->GetUid ());
     dataHeader.SetHop(1);
 
+    m_routingTable.Purge();
+
     RoutingTableEntry rt;
     if(m_routingTable.LookupRoute(dst,rt)){
-      // 将rt中关于目的地的位置、速度和时间戳写进dataHeader
       uint16_t dstSign = SetRightVelocity(rt.GetVx(), rt.GetVy(), rt.GetVz());
       dataHeader.SetDstPosx(rt.GetX());
       dataHeader.SetDstPosy(rt.GetY());
@@ -266,13 +245,22 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p,
       dataHeader.SetDstSign(dstSign);
       dataHeader.SetDstTimestamp(rt.GetTimestamp());
 
-      // 30s，和最大间隔更新时间一样
-      m_routingTable.Purge();
-
       Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
       Vector myPos = MM->GetPosition();
       std::map<Ipv4Address, RoutingTableEntry> neighborTable;
       m_routingTable.LookupNeighbor(neighborTable, myPos);
+
+      // 有目的地，但是没有邻居,丢弃
+      if(neighborTable.size() == 0){
+        p->AddHeader(dataHeader);
+        // 没有目的地的地址/没有邻居
+        DeferredRouteOutputTag tag (0);
+        if (!p->PeekPacketTag (tag))
+          {
+            p->AddPacketTag (tag);
+          }
+        return LoopbackRoute (header,oif);
+      }
 
       // 有邻居也有目的地的位置，则一定可以找到转发出去的下一跳
       Vector dstPos = m_routingTable.PredictPosition(dst);
@@ -286,8 +274,7 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p,
         route->SetSource (m_ipv4->GetAddress (1, 0).GetLocal ());
         route->SetOutputDevice (m_ipv4->GetNetDevice (1));
         return route;
-      }
-      else{
+      }else{
         if(m_enableRecoveryMode){
           // 没有找到合适的下一跳,符合恢复转发的条件（有目的地位置，有可转发邻居）
           dataHeader.SetRecPosx((uint16_t)myPos.x);
@@ -304,6 +291,7 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p,
           route->SetOutputDevice (m_ipv4->GetNetDevice (1));  
           return route;
         }else{
+          p->AddHeader(dataHeader);
           DeferredRouteOutputTag tag (0);
           if (!p->PeekPacketTag (tag))
             {
@@ -314,7 +302,7 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p,
       }
     }else{
       p->AddHeader(dataHeader);
-      // 没有目的地的地址/没有邻居
+      // 没有目的地的地址
       DeferredRouteOutputTag tag (1);
       if (!p->PeekPacketTag (tag))
         {
@@ -552,18 +540,56 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
   Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
   Vector myPos = MM->GetPosition();
 
-  // 预测目的地现在的位置
-  Vector predictDst = m_routingTable.PredictPosition(dst);
   std::map<Ipv4Address, RoutingTableEntry> neighborTable;
   m_routingTable.LookupNeighbor(neighborTable, myPos);
+
+  // 没有邻居转发，丢弃
+  if(neighborTable.size() == 0){
+    return false;
+  }
+
+  // 预测目的地现在的位置
+  Vector predictDst = m_routingTable.PredictPosition(dst);
    
   if(inRec == 1 && CalculateDistance (myPos, predictDst) < CalculateDistance (RecPosition, predictDst)){
     inRec = 0;
     dataHeader.SetInRec(0);
+    dataHeader.SetRecPosx (0);
+    dataHeader.SetRecPosy (0); 
+    dataHeader.SetRecPosz (0);
   }
+
+  if(inRec == 0){
+    Ipv4Address nextHop = m_routingTable.BestNeighbor (neighborTable, predictDst, myPos);
+    if (nextHop != Ipv4Address::GetZero ())
+    {
+      dataHeader.SetHop(dataHeader.GetHop() + 1);
+      p->AddHeader (dataHeader);  
+      if(id == icmpv4Header.GetTypeId()){
+        p->AddHeader(icmpv4Header);
+      }else{
+        p->AddHeader(udpHeader);
+      }        
+      Ptr<Ipv4Route> route = Create<Ipv4Route> ();
+      route->SetDestination (dst);
+      route->SetSource (header.GetSource ());
+      route->SetGateway (nextHop);
+      route->SetOutputDevice (m_ipv4->GetNetDevice (1));
+      ucb (route, p, header);
+      return true;
+    }else{
+      inRec = 1;
+      dataHeader.SetInRec(1);
+      dataHeader.SetRecPosx ((uint16_t)myPos.x);
+      dataHeader.SetRecPosy ((uint16_t)myPos.y); 
+      dataHeader.SetRecPosz ((uint16_t)myPos.z);
+    }
+  }
+
   // 如果数据包本身就是恢复模式，并且该节点到目的地的距离比进入恢复模式到目的地的距离更远，则继续恢复模式
   if(inRec == 1){
     if(m_enableRecoveryMode){
+      dataHeader.SetHop(dataHeader.GetHop() + 1);
       p->AddHeader (dataHeader);
       if(id == icmpv4Header.GetTypeId()){
         p->AddHeader(icmpv4Header);
@@ -582,50 +608,9 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
     }else{
       return false;
     }
-  }else{     //贪婪模式
-    Ipv4Address nextHop = m_routingTable.BestNeighbor (neighborTable, predictDst, myPos);
-    if (nextHop != Ipv4Address::GetZero ())
-    {
-      p->AddHeader (dataHeader);  
-      if(id == icmpv4Header.GetTypeId()){
-        p->AddHeader(icmpv4Header);
-      }else{
-        p->AddHeader(udpHeader);
-      }        
-      Ptr<Ipv4Route> route = Create<Ipv4Route> ();
-      route->SetDestination (dst);
-      route->SetSource (header.GetSource ());
-      route->SetGateway (nextHop);
-      route->SetOutputDevice (m_ipv4->GetNetDevice (1));
-      ucb (route, p, header);
-      return true;
-    }else{       // 如果贪婪转发没有找到合适的下一跳
-      if(m_enableRecoveryMode){
-        inRec = 1;
-        dataHeader.SetInRec(1);
-        dataHeader.SetRecPosx ((uint16_t)myPos.x);
-        dataHeader.SetRecPosy ((uint16_t)myPos.y); 
-        dataHeader.SetRecPosz ((uint16_t)myPos.z);
-        p->AddHeader (dataHeader);
-        if(id == icmpv4Header.GetTypeId()){
-          p->AddHeader(icmpv4Header);
-        }else{
-          p->AddHeader(udpHeader);
-        }
-        // 恢复模式
-        nextHop = RecoveryMode (neighborTable);
-        Ptr<Ipv4Route> route = Create<Ipv4Route> ();
-        route->SetDestination (dst);
-        route->SetSource (header.GetSource ());
-        route->SetGateway (nextHop);
-        route->SetOutputDevice (m_ipv4->GetNetDevice (1));  
-        ucb (route, p, header);
-        return true;
-      }else{
-        return false;
-      }     
-    }
   }
+
+  return false;
 }
 
 // ADD：贪婪转发
@@ -688,15 +673,11 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
   MyprotocolHeader myprotocolHeader;
   packet->RemoveHeader (myprotocolHeader);
 
-  Ipv4Address source = myprotocolHeader.GetMyadress();         //是哪个节点的位置信息
-
   // ADD:检查是否已经转发过，如果是则丢弃。
-  if (m_idCache.IsDuplicate (source, myprotocolHeader.GetTimestamp()))
+  if (m_idCache.IsDuplicate (myprotocolHeader.GetMyadress(), myprotocolHeader.GetTimestamp()))
   {
     return;
   }
-
-  m_routingTable.Purge();
 
   // 获取带符号的速度信息
   Vector velocity = GetRightVelocity(myprotocolHeader.GetVx(), myprotocolHeader.GetVy(), myprotocolHeader.GetVz(), myprotocolHeader.GetSign());
@@ -712,10 +693,25 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
   );
   m_routingTable.Update(newEntry);
 
-  // 收到位置更新之后检查queue中是否有待发送的数据包
-  // 更新了位置表之后，查看是否有数据包可以从queue中发送
+  packet->AddHeader(myprotocolHeader);
+  for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j
+       != m_socketAddresses.end (); ++j)
+  {
+    Ptr<Socket> socket = j->first;
+    Ipv4InterfaceAddress iface = j->second;
+    Ipv4Address destination;
+    if (iface.GetMask () == Ipv4Mask::GetOnes ())
+      {
+        destination = Ipv4Address ("255.255.255.255");
+      }
+    else
+      {
+        destination = iface.GetBroadcast ();
+      }
+    socket->SendTo (packet, 0, InetSocketAddress (destination, MYPROTOCOL_PORT));
+  }
+
   if(m_queue.Find(myprotocolHeader.GetMyadress())){
-    // 如果队列中有目的地为source的数据包
     DataHeader dataHeader;
     // 将rt中关于目的地的位置、速度和时间戳写进dataHeader
     dataHeader.SetDstPosx(myprotocolHeader.GetX());
@@ -727,11 +723,19 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
     dataHeader.SetDstSign(myprotocolHeader.GetSign());
     dataHeader.SetDstTimestamp(myprotocolHeader.GetTimestamp());
 
+    m_routingTable.Purge();
+
     //更新邻居表，以便打印路由 
     Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
     Vector myPos = MM->GetPosition();
     std::map<Ipv4Address, RoutingTableEntry> neighborTable;
     m_routingTable.LookupNeighbor(neighborTable, myPos);
+
+    // 没有邻居，则从队列中删除，并丢弃
+    if(neighborTable.size() == 0){
+      m_queue.DropPacketWithDst(myprotocolHeader.GetMyadress());
+      return;
+    }
 
     // 查找route
     Ptr<Ipv4Route> route = Create<Ipv4Route> ();
@@ -750,8 +754,7 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
       route->SetGateway(nexthop);
       route->SetSource (m_ipv4->GetAddress (1, 0).GetLocal ()); 
       route->SetOutputDevice (m_ipv4->GetNetDevice (1));
-    }
-    else{
+    }else{
       if(m_enableRecoveryMode){
         dataHeader.SetRecPosx((uint16_t)myPos.x);
         dataHeader.SetRecPosy((uint16_t)myPos.y);
@@ -768,25 +771,6 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
       } 
     }
     SendPacketFromQueue(myprotocolHeader.GetMyadress(), route, dataHeader);
-  }
-  
-  Ptr<Packet> p = Create<Packet> ();
-  p->AddHeader(myprotocolHeader);
-  for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j
-       != m_socketAddresses.end (); ++j)
-  {
-    Ptr<Socket> socket = j->first;
-    Ipv4InterfaceAddress iface = j->second;
-    Ipv4Address destination;
-    if (iface.GetMask () == Ipv4Mask::GetOnes ())
-      {
-        destination = Ipv4Address ("255.255.255.255");
-      }
-    else
-      {
-        destination = iface.GetBroadcast ();
-      }
-    socket->SendTo (p, 0, InetSocketAddress (destination, MYPROTOCOL_PORT));
   }
 }
 
@@ -815,18 +799,18 @@ RoutingProtocol::CheckChange ()
   // 1. 超出阈值就更新
   if(distance > m_transRange * m_scaleFactor){
     // 将本次更新的速度、方向记录
-    SendPeriodicUpdate();
+    SendUpdate();
   }
   // 如果超过最大间隔时间没有发送更新包，则发送
   if(Simulator::Now ().ToInteger(Time::S) - m_lastSendTime > m_maxIntervalTime){
-    SendPeriodicUpdate();
+    SendUpdate();
   }
   m_checkChangeTimer.Schedule (m_checkChangeInterval + MicroSeconds (25 * m_uniformRandomVariable->GetInteger (0,1000)));
 }
 
 // 周期发送控制包
 void
-RoutingProtocol::SendPeriodicUpdate ()
+RoutingProtocol::SendUpdate ()
 { 
   Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
   Vector myPos = MM->GetPosition();
@@ -881,10 +865,6 @@ RoutingProtocol::SendPeriodicUpdate ()
         }
       socket->SendTo (packet, 0, InetSocketAddress (destination, MYPROTOCOL_PORT));
     }
-
-  if(!m_enableAdaptiveUpdate){
-    m_periodicUpdateTimer.Schedule (m_periodicUpdateInterval + MicroSeconds (25 * m_uniformRandomVariable->GetInteger (0,1000)));
-  }
 }
 
 void
@@ -902,13 +882,9 @@ RoutingProtocol::SendPacketFromQueue (Ipv4Address dst, Ptr<Ipv4Route> route, Dat
       Icmpv4Header icmpv4Header;
       UdpHeader udpHeader;
       
-      // icmpv4的包
       if(id == icmpv4Header.GetTypeId()){
-        // 清除icmpv4的包头
         p->RemoveHeader(icmpv4Header);
       }else{
-        // 清除udpheader的包头
-        // 先清除前面多余的8个字节，就可以获得正确的header
         p->RemoveHeader(udpHeader);
       }
 
@@ -916,14 +892,11 @@ RoutingProtocol::SendPacketFromQueue (Ipv4Address dst, Ptr<Ipv4Route> route, Dat
       p->RemoveHeader(oldHeader);
       uint64_t uid = oldHeader.GetUid();
       dataHeader.SetUid(uid);
+      dataHeader.SetHop(1);
       p->AddHeader(dataHeader);
-      // icmpv4的包
       if(id == icmpv4Header.GetTypeId()){
-        // 清除icmpv4的包头
         p->AddHeader(icmpv4Header);
       }else{
-        // 清除udpheader的包头
-        // 先清除前面多余的8个字节，就可以获得正确的header
         p->AddHeader(udpHeader);
       }
 

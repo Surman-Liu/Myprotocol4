@@ -18,21 +18,12 @@
 namespace ns3 {
 namespace myprotocol4 {
 
-/**
- * \ingroup myprotocol
- * \brief myprotocol routing protocol.
- */
 class RoutingProtocol : public Ipv4RoutingProtocol
 {
 public:
-  /**
-   * \brief Get the type ID.
-   * \return the object TypeId
-   */
   static TypeId GetTypeId (void);
   static const uint32_t MYPROTOCOL_PORT;
 
-  /// c-tor
   RoutingProtocol ();
   virtual
   ~RoutingProtocol ();
@@ -41,17 +32,6 @@ public:
 
   // From Ipv4RoutingProtocol
   Ptr<Ipv4Route> RouteOutput (Ptr<Packet> p, const Ipv4Header &header, Ptr<NetDevice> oif, Socket::SocketErrno &sockerr);
-  /**
-   * Route input packet
-   * \param p The packet
-   * \param header The IPv4 header
-   * \param idev The device
-   * \param ucb The unicast forward callback
-   * \param mcb The multicast forward callback
-   * \param lcb The local deliver callback
-   * \param ecb The error callback
-   * \returns true if successful
-   */
   bool RouteInput (Ptr<const Packet> p, const Ipv4Header &header, Ptr<const NetDevice> idev, UnicastForwardCallback ucb,
                    MulticastForwardCallback mcb, LocalDeliverCallback lcb, ErrorCallback ecb);
   virtual void PrintRoutingTable (Ptr<OutputStreamWrapper> stream, Time::Unit unit = Time::S) const;
@@ -71,25 +51,7 @@ public:
    */
   int64_t AssignStreams (int64_t stream);
 
-  void SetMaxQueueLen (uint32_t len)
-  {
-    m_maxQueueLen = len;
-    m_queue.SetMaxQueueLen (len);
-  }
-  void SetMaxQueueTime (Time t)
-  {
-    m_maxQueueTime = t;
-    m_queue.SetQueueTimeout (t);
-  }
-
 private:
-  // Protocol parameters.
-  /// PeriodicUpdateInterval specifies the periodic time interval between which the a node broadcasts
-  /// its entire routing table.
-  Time m_periodicUpdateInterval;
-
-  // ADD:是否启用自适应更新
-  bool m_enableAdaptiveUpdate;
   // ADD:是否使用恢复策略
   bool m_enableRecoveryMode;
   // ADD:是都使用queue
@@ -114,10 +76,6 @@ private:
 
   // ADD：初始化id-cache需要的相关时间变量
   uint32_t m_netDiameter;             ///< Net diameter measures the maximum possible number of hops between two nodes in the network
-  /**
-   *  NodeTraversalTime is a conservative estimate of the average one hop traversal time for packets
-   *  and should include queuing delays, interrupt processing times and transfer times.
-   */
   Time m_nodeTraversalTime;
   Time m_netTraversalTime;             ///< Estimate of the average net traversal time.
   Time m_pathDiscoveryTime;            ///< Estimate of maximum time needed to find route in network.
@@ -181,7 +139,7 @@ private:
   LoopbackRoute (const Ipv4Header & header, Ptr<NetDevice> oif) const;
 
   void
-  SendPeriodicUpdate ();
+  SendUpdate ();
 
   void SendPacketFromQueue (Ipv4Address dst, Ptr<Ipv4Route> route, DataHeader dataHeader);
 
@@ -203,9 +161,6 @@ private:
   // ADD:恢复模式
   Ipv4Address RecoveryMode(std::map<Ipv4Address, RoutingTableEntry> & neighborTable);
 
-  /// Timer to trigger periodic updates from a node
-  Timer m_periodicUpdateTimer;
-
   // ADD:定时检查速度方向变化的计时器
   Timer m_checkChangeTimer;
 
@@ -216,4 +171,4 @@ private:
 }
 }
 
-#endif /* MYPROTOCOL_ROUTING_PROTOCOL_H */
+#endif 
