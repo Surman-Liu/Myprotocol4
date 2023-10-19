@@ -693,7 +693,8 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
   );
   m_routingTable.Update(newEntry);
 
-  packet->AddHeader(myprotocolHeader);
+  Ptr<Packet> p = Create<Packet> ();
+  p->AddHeader(myprotocolHeader);
   for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j
        != m_socketAddresses.end (); ++j)
   {
@@ -708,7 +709,7 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
       {
         destination = iface.GetBroadcast ();
       }
-    socket->SendTo (packet, 0, InetSocketAddress (destination, MYPROTOCOL_PORT));
+    socket->SendTo (p, 0, InetSocketAddress (destination, MYPROTOCOL_PORT));
   }
 
   if(m_queue.Find(myprotocolHeader.GetMyadress())){
@@ -831,6 +832,8 @@ RoutingProtocol::SendUpdate ()
                                     /* timestamp */Simulator::Now ().ToInteger(Time::S), /* adress */Ipv4Address::GetLoopback ());
   m_routingTable.Update(rt);
 
+  Ptr<Packet> packet = Create<Packet> ();
+
   MyprotocolHeader myprotocolHeader;
   myprotocolHeader.SetX((uint16_t)myPos.x);
   myprotocolHeader.SetY((uint16_t)myPos.y);
@@ -841,8 +844,8 @@ RoutingProtocol::SendUpdate ()
   myprotocolHeader.SetSign(sign);
   myprotocolHeader.SetTimestamp(m_lastSendTime);
   myprotocolHeader.SetMyadress(m_ipv4->GetAddress (1, 0).GetLocal ());
+  myprotocolHeader.SetUid(packet->GetUid ());
 
-  Ptr<Packet> packet = Create<Packet> ();
   packet->AddHeader (myprotocolHeader);
 
   for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j

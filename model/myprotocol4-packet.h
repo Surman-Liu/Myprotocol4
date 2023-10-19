@@ -13,7 +13,7 @@ class MyprotocolHeader : public Header
 {
 public:
   MyprotocolHeader (uint16_t x = 0, uint16_t y = 0, uint16_t z = 0, uint16_t vx = 0, uint16_t vy = 0, uint16_t vz = 0, uint16_t sign = 0, 
-                    uint16_t timestamp = 0, Ipv4Address myadress = Ipv4Address ());
+                    uint16_t timestamp = 0, Ipv4Address myadress = Ipv4Address (), uint64_t uid = 0);
   virtual ~MyprotocolHeader ();
   static TypeId GetTypeId (void);
   virtual TypeId GetInstanceTypeId (void) const;
@@ -80,6 +80,14 @@ public:
   {
     return m_myadress;
   }
+  void SetUid (uint64_t uid)
+  {
+    m_uid = uid;
+  }
+  uint64_t GetUid () const
+  {
+    return m_uid;
+  }
 private:
   //ADD:添加位置信息、速度信息、时间戳
   uint16_t m_x;
@@ -91,6 +99,7 @@ private:
   uint16_t m_sign;      //记录速度是否为负数，0:都不是负数，1:X轴速度为负，2:Y轴速度为负，3:Z轴速度为负,4：xy为负数，5：xz为负数，6：yz为负数，7：全部都是负数
   uint16_t m_timestamp;
   Ipv4Address m_myadress;
+  uint64_t m_uid;
 };
 
 static inline std::ostream & operator<< (std::ostream& os, const MyprotocolHeader & packet)
