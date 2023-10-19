@@ -1,30 +1,3 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
-/*
- * Copyright (c) 2009 IITP RAS
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- * Based on
- *      NS-2 AODV model developed by the CMU/MONARCH group and optimized and
- *      tuned by Samir Das and Mahesh Marina, University of Cincinnati;
- *
- *      AODV-UU implementation by Erik Nordström of Uppsala University
- *      http://core.it.uu.se/core/index.php/AODV-UU
- *
- * Authors: Elena Buchatskaia <borovkovaes@iitp.ru>
- *          Pavel Boyko <boyko@iitp.ru>
- */
 #ifndef MYPROTOCOL4_RQUEUE_H
 #define MYPROTOCOL4_RQUEUE_H
 
@@ -35,11 +8,6 @@
 
 namespace ns3 {
 namespace myprotocol4 {
-
-/**
- * \ingroup aodv
- * \brief AODV Queue Entry
- */
 class QueueEntry
 {
 public:
@@ -47,15 +15,7 @@ public:
   typedef Ipv4RoutingProtocol::UnicastForwardCallback UnicastForwardCallback;
   /// IPv4 routing error callback typedef
   typedef Ipv4RoutingProtocol::ErrorCallback ErrorCallback;
-  /**
-   * constructor
-   *
-   * \param pa the packet to add to the queue
-   * \param h the Ipv4Header
-   * \param ucb the UnicastForwardCallback function
-   * \param ecb the ErrorCallback function
-   * \param exp the expiration time
-   */
+
   QueueEntry (Ptr<const Packet> pa = 0, Ipv4Header const & h = Ipv4Header (),
               UnicastForwardCallback ucb = UnicastForwardCallback (),
               ErrorCallback ecb = ErrorCallback (), Time exp = Simulator::Now ())
@@ -67,17 +27,11 @@ public:
   {
   }
 
-  /**
-   * \brief Compare queue entries
-   * \param o QueueEntry to compare
-   * \return true if equal
-   */
   bool operator== (QueueEntry const & o) const
   {
     return ((m_packet == o.m_packet) && (m_header.GetDestination () == o.m_header.GetDestination ()) && (m_expire == o.m_expire));
   }
 
-  // Fields
   /**
    * Get unicast forward callback
    * \returns unicast callback
@@ -171,21 +125,10 @@ private:
   /// Expire time for queue entry
   Time m_expire;
 };
-/**
- * \ingroup aodv
- * \brief AODV route request queue
- *
- * Since AODV is an on demand routing we queue requests while looking for route.
- */
+
 class RequestQueue
 {
 public:
-  /**
-   * constructor
-   *
-   * \param maxLen the maximum length
-   * \param routeToQueueTimeout the route to queue timeout
-   */
   RequestQueue (uint32_t maxLen, Time routeToQueueTimeout)
     : m_maxLen (maxLen),
       m_queueTimeout (routeToQueueTimeout)
@@ -284,7 +227,7 @@ private:
 };
 
 
-}  // namespace aodv
-}  // namespace ns3
+}
+}
 
-#endif /* AODV_RQUEUE_H */
+#endif

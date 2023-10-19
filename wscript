@@ -1,4 +1,4 @@
-## -*- Mode: python; py-indent-offset: 4; indent-tabs-mode: nil; coding: utf-8; -*-
+## -*- 使用位置预测进行自适应更新 -*-
 
 def build(bld):
     module = bld.create_ns3_module('myprotocol4', ['internet'])
@@ -11,11 +11,6 @@ def build(bld):
         'model/myprotocol4-rqueue.cc',
         'helper/myprotocol4-helper.cc'
         ]
-
-    # module_test = bld.create_ns3_module_test_library('myprotocol')
-    # module_test.source = [
-    #     'test/myprotocol-testcase.cc',
-    #     ]
 
     headers = bld(features='ns3header')
     headers.module = 'myprotocol4'

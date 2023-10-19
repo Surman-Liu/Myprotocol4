@@ -1,22 +1,3 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
-/*
- * Copyright (c) 2009 IITP RAS
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- */
-
 #ifndef MYPROTOCOL4_ID_CACHE_H
 #define MYPROTOCOL4_ID_CACHE_H
 
@@ -26,18 +7,9 @@
 
 namespace ns3 {
 namespace myprotocol4 {
-/**
- * \ingroup myprotocol
- *
- * \brief Unique packets identification cache used for simple duplicate detection.
- */
 class IdCache
 {
 public:
-  /**
-   * constructor
-   * \param lifetime the lifetime for added entries
-   */
   IdCache (Time lifetime) : m_lifetime (lifetime)
   {
   }
@@ -81,17 +53,8 @@ private:
     /// When record will expire
     Time m_expire;
   };
-  /**
-   * \brief IsExpired structure
-   */
   struct IsExpired
   {
-    /**
-     * \brief Check if the entry is expired
-     *
-     * \param u UniqueId entry
-     * \return true if expired, false otherwise
-     */
     bool operator() (const struct UniqueId & u) const
     {
       return (u.m_expire < Simulator::Now ());
@@ -103,7 +66,7 @@ private:
   Time m_lifetime;
 };
 
-}  // namespace myprotocol
-}  // namespace ns3
+} 
+}
 
-#endif /* myprotocol_ID_CACHE_H */
+#endif

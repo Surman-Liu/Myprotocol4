@@ -1,34 +1,3 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
-/*
- * Copyright (c) 2010 Hemanth Narra
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- * Author: Hemanth Narra <hemanth@ittc.ku.com>
- *
- * James P.G. Sterbenz <jpgs@ittc.ku.edu>, director
- * ResiliNets Research Group  http://wiki.ittc.ku.edu/resilinets
- * Information and Telecommunication Technology Center (ITTC)
- * and Department of Electrical Engineering and Computer Science
- * The University of Kansas Lawrence, KS USA.
- *
- * Work supported in part by NSF FIND (Future Internet Design) Program
- * under grant CNS-0626918 (Postmodern Internet Architecture),
- * NSF grant CNS-1050226 (Multilayer Network Resilience Analysis and Experimentation on GENI),
- * US Department of Defense (DoD), and ITTC at The University of Kansas.
- */
-
 #ifndef MYPROTOCOL4_PACKET_H
 #define MYPROTOCOL4_PACKET_H
 
@@ -39,39 +8,13 @@
 
 namespace ns3 {
 namespace myprotocol4 {
-/**
- * \ingroup myprotocol
- * \brief myprotocol Update Packet Format
- * \verbatim
- |      0        |      1        |      2        |       3       |
-  0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7
- +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- |                      Destination Address                      |
- +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- |                            HopCount                           |
- +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- |                       Sequence Number                         |
- +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * \endverbatim
- */
 
 class MyprotocolHeader : public Header
 {
 public:
-  /**
-   * Constructor
-   *
-   * \param dst destination IP address
-   * \param hopcount hop count
-   * \param dstSeqNo destination sequence number
-   */
   MyprotocolHeader (uint16_t x = 0, uint16_t y = 0, uint16_t z = 0, uint16_t vx = 0, uint16_t vy = 0, uint16_t vz = 0, uint16_t sign = 0, 
                     uint16_t timestamp = 0, Ipv4Address myadress = Ipv4Address ());
   virtual ~MyprotocolHeader ();
-  /**
-   * \brief Get the type ID.
-   * \return the object TypeId
-   */
   static TypeId GetTypeId (void);
   virtual TypeId GetInstanceTypeId (void) const;
   virtual uint32_t GetSerializedSize () const;
@@ -79,7 +22,6 @@ public:
   virtual uint32_t Deserialize (Buffer::Iterator start);
   virtual void Print (std::ostream &os) const;
 
-  //ADD
   void SetX(uint16_t x){
     m_x = x;
   }
@@ -147,7 +89,6 @@ private:
   uint16_t m_vy;
   uint16_t m_vz;
   uint16_t m_sign;      //记录速度是否为负数，0:都不是负数，1:X轴速度为负，2:Y轴速度为负，3:Z轴速度为负,4：xy为负数，5：xz为负数，6：yz为负数，7：全部都是负数
-  //以秒为单位的整数，每次重新运行代码都是从0s开始
   uint16_t m_timestamp;
   Ipv4Address m_myadress;
 };
@@ -161,14 +102,12 @@ static inline std::ostream & operator<< (std::ostream& os, const MyprotocolHeade
 class DataHeader : public Header
 {
 public:
-  /// c-tor
   DataHeader (uint16_t dstPosx = 0, uint16_t dstPosy = 0, uint16_t dstPosz = 0, 
               uint16_t dstVelx = 0, uint16_t dstVely = 0, uint16_t dstVelz = 0, 
               uint16_t dstSign = 0, uint16_t dstTimestamp = 0, 
               uint16_t recPosx = 0, uint16_t recPosy = 0, uint16_t recPosz = 0, uint16_t inRec  = 0,
               uint64_t uid = 0, uint16_t hop = 0);
 
-  ///\name Header serialization/deserialization
   static TypeId GetTypeId ();
   TypeId GetInstanceTypeId () const;
   uint32_t GetSerializedSize () const;
@@ -176,7 +115,6 @@ public:
   uint32_t Deserialize (Buffer::Iterator start);
   void Print (std::ostream &os) const;
 
-  /// get/set function
   void SetDstPosx (uint16_t posx)
   {
     m_dstPosx = posx;
@@ -315,4 +253,4 @@ std::ostream & operator<< (std::ostream & os, DataHeader const & h);
 }
 }
 
-#endif /* MYPROTOCOL_PACKET_H */
+#endif

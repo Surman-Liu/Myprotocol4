@@ -1,33 +1,3 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
-/*
- * Copyright (c) 2010 Hemanth Narra
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- * Author: Hemanth Narra <hemanth@ittc.ku.com>
- *
- * James P.G. Sterbenz <jpgs@ittc.ku.edu>, director
- * ResiliNets Research Group  http://wiki.ittc.ku.edu/resilinets
- * Information and Telecommunication Technology Center (ITTC)
- * and Department of Electrical Engineering and Computer Science
- * The University of Kansas Lawrence, KS USA.
- *
- * Work supported in part by NSF FIND (Future Internet Design) Program
- * under grant CNS-0626918 (Postmodern Internet Architecture),
- * NSF grant CNS-1050226 (Multilayer Network Resilience Analysis and Experimentation on GENI),
- * US Department of Defense (DoD), and ITTC at The University of Kansas.
- */
 #include "myprotocol4-rtable.h"
 #include "ns3/simulator.h"
 #include <iomanip>
@@ -64,7 +34,6 @@ RoutingTableEntry::~RoutingTableEntry ()
 
 RoutingTable::RoutingTable ()
 {
-  // 每个表项的有效生存时间为maxIntervalTime
   m_entryLifeTime = 30;
 }
 
@@ -72,7 +41,6 @@ bool
 RoutingTable::LookupRoute (Ipv4Address id,
                            RoutingTableEntry & rt)
 {
-  Purge();
   if (m_positionTable.empty ())
     {
       return false;
@@ -133,13 +101,6 @@ RoutingTable::Print (Ptr<OutputStreamWrapper> stream) const
     {
       i->second.Print (stream);
     }
-  *stream->GetStream () << "=====================neighbor table=======================\n";
-  for (std::map<Ipv4Address, RoutingTableEntry>::const_iterator i = m_neiborTable.begin (); i
-       != m_neiborTable.end (); ++i)
-    {
-      i->second.Print (stream);
-    }
-
   *stream->GetStream () << "\n";
 }
 
@@ -153,7 +114,6 @@ RoutingTable::PredictPosition(Ipv4Address id){
   }else{
     // 先获取该节点的速度、位置、时间戳
     uint16_t deltaTime = Simulator::Now ().ToInteger(Time::S) - rt.GetTimestamp();
-    // std::cout<<"deltaTime = "<<deltaTime<<"; now = "<<Simulator::Now ().ToInteger(Time::S)<<"; timestamp = "<<rt.GetTimestamp()<<"\n";
     int16_t tempX = rt.GetX() + deltaTime * rt.GetVx();
     int16_t tempY = rt.GetY() + deltaTime * rt.GetVy();
     int16_t tempZ = rt.GetZ() + deltaTime * rt.GetVz();
@@ -173,23 +133,15 @@ RoutingTable::PredictPosition(Ipv4Address id){
 // ADD：筛选邻居节点
 void 
 RoutingTable::LookupNeighbor(std::map<Ipv4Address, RoutingTableEntry> & neighborTable, Vector myPos){
-  // 传输范围250m
   uint16_t TransmissionRange = 250;
-  m_neiborTable.clear();
   for (std::map<Ipv4Address, RoutingTableEntry>::iterator i = m_positionTable.begin (); i != m_positionTable.end (); i++){
     if(i->first == Ipv4Address::GetLoopback () || i->first == Ipv4Address("10.1.1.255") || i->first == Ipv4Address("255.255.255.255")){
       continue;
     }
-    RoutingTableEntry rt = i->second;
     Vector predictPos = PredictPosition(i->first);
-    if(CalculateDistance (predictPos, Vector(-1,-1,-1)) == 0){
-      continue;
-    }
     double distance = CalculateDistance(predictPos, myPos);
-    // 距离小于传输范围，可以认为是邻居
     if(distance <= TransmissionRange){
       neighborTable.insert(std::make_pair(i->first,i->second));
-      m_neiborTable.insert(std::make_pair(i->first,i->second));
     }
   }
 }
@@ -199,32 +151,29 @@ RoutingTable::LookupNeighbor(std::map<Ipv4Address, RoutingTableEntry> & neighbor
 Ipv4Address 
 RoutingTable::BestNeighbor (std::map<Ipv4Address, RoutingTableEntry> neighborTable, Vector dstPos, Vector myPos)
 {
-  if(CalculateDistance (dstPos, Vector(-1,-1,-1)) == 0){
-    return Ipv4Address::GetZero ();
-  }
-
   double initialDistance = CalculateDistance (dstPos, myPos);
 
   if (neighborTable.empty ())
     {
       std::cout<<"Neighbor table is empty!!!\n";
-      NS_LOG_DEBUG ("Neighbor table is empty");
       return Ipv4Address::GetZero ();
-    }     //if table is empty (no neighbours)
+    }
+
   Ipv4Address bestFoundID = neighborTable.begin ()->first;
   double bestFoundDistance = CalculateDistance (PredictPosition(neighborTable.begin ()->first), dstPos);
 
   for (std::map<Ipv4Address, RoutingTableEntry>::iterator i = neighborTable.begin (); i != neighborTable.end (); i++){
-    if(bestFoundDistance > CalculateDistance (PredictPosition(i->first), dstPos)){
+    double distance = CalculateDistance (PredictPosition(i->first), dstPos);
+    if(bestFoundDistance > distance){
       bestFoundID = i->first;
-      bestFoundDistance = CalculateDistance (PredictPosition(i->first), dstPos);
+      bestFoundDistance = distance;
     }
   }  
   if(initialDistance > bestFoundDistance){
     return bestFoundID;
   }else{
     std::cout<<"There is no closer neighbor!!!\n";
-    return Ipv4Address::GetZero (); //so it enters Recovery-mode
+    return Ipv4Address::GetZero ();
   }
 }
 

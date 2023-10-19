@@ -1,34 +1,3 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
-/*
- * Copyright (c) 2010 Hemanth Narra
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- * Author: Hemanth Narra <hemanth@ittc.ku.com>
- *
- * James P.G. Sterbenz <jpgs@ittc.ku.edu>, director
- * ResiliNets Research Group  http://wiki.ittc.ku.edu/resilinets
- * Information and Telecommunication Technology Center (ITTC)
- * and Department of Electrical Engineering and Computer Science
- * The University of Kansas Lawrence, KS USA.
- *
- * Work supported in part by NSF FIND (Future Internet Design) Program
- * under grant CNS-0626918 (Postmodern Internet Architecture),
- * NSF grant CNS-1050226 (Multilayer Network Resilience Analysis and Experimentation on GENI),
- * US Department of Defense (DoD), and ITTC at The University of Kansas.
- */
-
 #ifndef MYPROTOCOL4_RTABLE_H
 #define MYPROTOCOL4_RTABLE_H
 
@@ -48,41 +17,18 @@
 namespace ns3 {
 namespace myprotocol4 {
 
-/**
- * \ingroup myprotocol
- * \brief Routing table entry
- */
 class RoutingTableEntry
 {
 public:
-  /**
-   * c-tor
-   *
-   * \param dev the net device
-   * \param dst the destination IP address
-   * \param seqNo the sequence number
-   * \param iface the interface
-   * \param hops the number of hops
-   * \param nextHop the IP address of the next hop
-   * \param lifetime the lifetime 
-   * \param SettlingTime the settling time
-   * \param changedEntries flag for changed entries
-   */
-  // ADD:在构造函数中添加位置、速度、时间戳
   RoutingTableEntry (uint16_t x = 0,uint16_t y = 0,uint16_t z = 0, 
                     int16_t vx = 0,int16_t vy = 0,int16_t vz = 0,
                     uint16_t timestamp = 0, Ipv4Address adress = Ipv4Address ());
 
   ~RoutingTableEntry ();
 
-  /**
-   * Print routing table entry
-   * \param stream the output stream
-   */
   void
   Print (Ptr<OutputStreamWrapper> stream) const;
 
-  //ADD
   void SetX(uint16_t x){
     m_x = x;
   }
@@ -146,10 +92,6 @@ private:
   Ipv4Address m_adress;
 };
 
-/**
- * \ingroup myprotocol
- * \brief The Routing table used by myprotocol protocol
- */
 class RoutingTable
 {
 public:
@@ -203,19 +145,11 @@ public:
   // ADD：筛选邻居节点
   void LookupNeighbor(std::map<Ipv4Address, RoutingTableEntry> & neighborTable, Vector myPos);
 
-  // ADD:贪婪寻找最优下一跳的函数
-  /**
-   * \brief Gets next hop according to GPSR protocol
-   * \param position the position of the destination node
-   * \param nodePos the position of the node that has the packet
-   * \return Ipv4Address of the next hop, Ipv4Address::GetZero () if no nighbour was found in greedy mode
-   */
   Ipv4Address BestNeighbor (std::map<Ipv4Address, RoutingTableEntry> neighborTable, Vector dstPos, Vector myPos);    //dstPos需要时经过预测后的目的地位置
 
   void Purge();
 
 private:
-  // Fields
   // 表项过期时间
   uint16_t m_entryLifeTime;
   /// an entry in the routing table.
@@ -225,4 +159,4 @@ private:
 };
 }
 }
-#endif /* MYPROTOCOL_RTABLE_H */
+#endif
