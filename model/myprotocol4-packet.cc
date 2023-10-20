@@ -208,8 +208,8 @@ DataHeader::Print (std::ostream &os) const
      << " RecPositionY: " << m_recPosy
      << " RecPositionZ: " << m_recPosz
      << " inRec: " << m_inRec
-     << " uid: "<<m_uid
-     << " hop: "<<m_hop;
+     << " hop: "<<m_hop
+     << " uid: "<<m_uid;
 }
 
 std::ostream &
