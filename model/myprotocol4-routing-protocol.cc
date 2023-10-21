@@ -885,24 +885,6 @@ RoutingProtocol::SendPacketFromQueue (Ipv4Address dst, Ptr<Ipv4Route> route, Dat
       Icmpv4Header icmpv4Header;
       UdpHeader udpHeader;
       
-      if(id == icmpv4Header.GetTypeId()){
-        p->RemoveHeader(icmpv4Header);
-      }else{
-        p->RemoveHeader(udpHeader);
-      }
-
-      DataHeader oldHeader;
-      p->RemoveHeader(oldHeader);
-      uint64_t uid = oldHeader.GetUid();
-      dataHeader.SetUid(uid);
-      dataHeader.SetHop(1);
-      p->AddHeader(dataHeader);
-      if(id == icmpv4Header.GetTypeId()){
-        p->AddHeader(icmpv4Header);
-      }else{
-        p->AddHeader(udpHeader);
-      }
-
       UnicastForwardCallback ucb = queueEntry.GetUnicastForwardCallback ();
       Ipv4Header header = queueEntry.GetIpv4Header ();
       ucb (route, p, header);
