@@ -96,11 +96,11 @@ RoutingProtocol::GetTypeId (void)
                    MakeTimeAccessor (&RoutingProtocol::m_checkChangeInterval),
                    MakeTimeChecker ())
     .AddAttribute ("EnableRecoveryMode","Enables use recoery mode. ",
-                   BooleanValue (true),
+                   BooleanValue (false),
                    MakeBooleanAccessor (&RoutingProtocol::m_enableRecoveryMode),
                    MakeBooleanChecker ())   
     .AddAttribute ("EnableQueue","Enables use queue. ",
-                   BooleanValue (true),
+                   BooleanValue (false),
                    MakeBooleanAccessor (&RoutingProtocol::m_enableQueue),
                    MakeBooleanChecker ());         
   return tid;
@@ -124,13 +124,13 @@ RoutingProtocol::RoutingProtocol ()
     m_lastSendTime(0),
     m_lastSendPos(Vector(0,0,0)),
     m_lastSendVelocity(Vector(0,0,0)),
-    m_maxIntervalTime(30),
+    m_maxIntervalTime(20),
     m_idCache(m_pathDiscoveryTime),            // 每个生命周期是2.4s
     m_maxQueueLen (64),
     m_maxQueueTime (Seconds (30)),
     m_queue (m_maxQueueLen, m_maxQueueTime),
     m_transRange(250),
-    m_scaleFactor(1),
+    m_scaleFactor(1.5),
     m_checkChangeTimer(Timer::CANCEL_ON_DESTROY)
 {
   m_uniformRandomVariable = CreateObject<UniformRandomVariable> ();
@@ -712,6 +712,11 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
     socket->SendTo (p, 0, InetSocketAddress (destination, MYPROTOCOL_PORT));
   }
 
+  // 如果不能使用队列，直接返回
+  if(!m_enableQueue){
+    return;
+  }
+
   if(m_queue.Find(myprotocolHeader.GetMyadress())){
     DataHeader dataHeader;
     // 将rt中关于目的地的位置、速度和时间戳写进dataHeader
@@ -768,10 +773,12 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
         route->SetSource (m_ipv4->GetAddress (1, 0).GetLocal ()); 
         route->SetOutputDevice (m_ipv4->GetNetDevice (1)); 
       }else{
+        m_queue.DropPacketWithDst(myprotocolHeader.GetMyadress());
         return;
       } 
     }
     SendPacketFromQueue(myprotocolHeader.GetMyadress(), route, dataHeader);
+    return;
   }
 }
 
