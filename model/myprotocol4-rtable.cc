@@ -80,8 +80,9 @@ RoutingTable::Update (RoutingTableEntry & rt)
   if (i == m_positionTable.end ())
     {
       AddRoute(rt);
+    }else{
+      i->second = rt;
     }
-  i->second = rt;
   return true;
 }
 

@@ -478,7 +478,11 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
   DataHeader dataHeader;
   p->RemoveHeader(dataHeader);
 
-  dataHeader.SetHop(dataHeader.GetHop() + 1);
+  uint16_t hop = dataHeader.GetHop();
+  // 如果转发跳数超过10，很有可能出现了循环（预测与实际不符），直接丢弃。
+  if(hop >= 10){
+    return false;
+  }
 
   Vector DstPosition;
   Vector DstVelocity;
