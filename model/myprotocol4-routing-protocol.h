@@ -13,6 +13,8 @@
 #include "ns3/output-stream-wrapper.h"
 // 添加移动模型
 #include "ns3/mobility-model.h"
+// 添加位置服务
+#include "ns3/god.h"
 #include<cmath>
 
 namespace ns3 {
@@ -97,6 +99,8 @@ private:
   // ADD：扩大范围因子
   float m_scaleFactor;
 
+  // ADD：位置服务，用来统计位置误差
+  Ptr<LocationService> m_locationService;
 private:
   /// Start protocol operation
   void

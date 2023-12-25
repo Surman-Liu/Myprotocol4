@@ -134,6 +134,8 @@ RoutingProtocol::RoutingProtocol ()
     m_checkChangeTimer(Timer::CANCEL_ON_DESTROY)
 {
   m_uniformRandomVariable = CreateObject<UniformRandomVariable> ();
+  // ADD：初始化位置服务
+  m_locationService = CreateObject<GodLocationService> ();
 }
 
 RoutingProtocol::~RoutingProtocol ()
@@ -230,6 +232,7 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p,
     dataHeader.SetInRec(0);
     dataHeader.SetUid(p->GetUid ());
     dataHeader.SetHop(1);
+    dataHeader.SetError(0);
 
     m_routingTable.Purge();
 
@@ -250,6 +253,13 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p,
       std::map<Ipv4Address, RoutingTableEntry> neighborTable;
       m_routingTable.LookupNeighbor(neighborTable, myPos);
 
+      // 有邻居也有目的地的位置，则一定可以找到转发出去的下一跳
+      Vector dstPos = m_routingTable.PredictPosition(dst);
+      // 计算位置准确度
+      Vector realDstPos = m_locationService->GetPosition(dst);
+      uint16_t error = CalculateDistance(dstPos, realDstPos);
+      dataHeader.SetError(error);
+
       // 有目的地，但是没有邻居,丢弃
       if(neighborTable.size() == 0){
         p->AddHeader(dataHeader);
@@ -261,9 +271,6 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p,
           }
         return LoopbackRoute (header,oif);
       }
-
-      // 有邻居也有目的地的位置，则一定可以找到转发出去的下一跳
-      Vector dstPos = m_routingTable.PredictPosition(dst);
 
       Ipv4Address nexthop = m_routingTable.BestNeighbor(neighborTable, dstPos, myPos);
       // 数据包找到了合适的下一跳
@@ -547,13 +554,17 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
   std::map<Ipv4Address, RoutingTableEntry> neighborTable;
   m_routingTable.LookupNeighbor(neighborTable, myPos);
 
+  // 预测目的地现在的位置
+  Vector predictDst = m_routingTable.PredictPosition(dst);
+  // 计算位置准确度
+  Vector realDstPos = m_locationService->GetPosition(dst);
+  uint16_t error = CalculateDistance(predictDst, realDstPos);
+  dataHeader.SetError(error);
+
   // 没有邻居转发，丢弃
   if(neighborTable.size() == 0){
     return false;
   }
-
-  // 预测目的地现在的位置
-  Vector predictDst = m_routingTable.PredictPosition(dst);
    
   if(inRec == 1 && CalculateDistance (myPos, predictDst) < CalculateDistance (RecPosition, predictDst)){
     inRec = 0;
@@ -741,6 +752,13 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
     std::map<Ipv4Address, RoutingTableEntry> neighborTable;
     m_routingTable.LookupNeighbor(neighborTable, myPos);
 
+    // 根据预测的目的地位置，选择最优的下一跳
+    Vector dstPos = m_routingTable.PredictPosition(myprotocolHeader.GetMyadress());
+    // 计算位置准确度
+    Vector realDstPos = m_locationService->GetPosition(myprotocolHeader.GetMyadress());
+    uint16_t error = CalculateDistance(dstPos, realDstPos);
+    dataHeader.SetError(error);
+
     // 没有邻居，则从队列中删除，并丢弃
     if(neighborTable.size() == 0){
       m_queue.DropPacketWithDst(myprotocolHeader.GetMyadress());
@@ -749,9 +767,6 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
 
     // 查找route
     Ptr<Ipv4Route> route = Create<Ipv4Route> ();
-
-    // 根据预测的目的地位置，选择最优的下一跳
-    Vector dstPos = m_routingTable.PredictPosition(myprotocolHeader.GetMyadress());
     Ipv4Address nexthop = m_routingTable.BestNeighbor(neighborTable, dstPos, myPos);
     // 数据包找到了合适的下一跳
     if(nexthop != Ipv4Address::GetZero ()){
@@ -845,6 +860,25 @@ RoutingProtocol::SendUpdate ()
 
   Ptr<Packet> packet = Create<Packet> ();
 
+  if(myPos.x < 0){
+    myPos.x = 0;
+  }
+  if(myPos.y < 0){
+    myPos.y = 0;
+  }
+  if(myPos.z < 0){
+    myPos.z = 0;
+  }
+  if(myPos.x > 1000){
+    myPos.x = 1000;
+  }
+  if(myPos.y > 1000){
+    myPos.y = 1000;
+  }
+  if(myPos.z > 300){
+    myPos.z = 300;
+  }
+
   MyprotocolHeader myprotocolHeader;
   myprotocolHeader.SetX((uint16_t)myPos.x);
   myprotocolHeader.SetY((uint16_t)myPos.y);
@@ -895,6 +929,23 @@ RoutingProtocol::SendPacketFromQueue (Ipv4Address dst, Ptr<Ipv4Route> route, Dat
       TypeId id = item.tid;
       Icmpv4Header icmpv4Header;
       UdpHeader udpHeader;
+
+      // icmpv4的包
+      if(id == icmpv4Header.GetTypeId()){
+        std::cout<<"this is not udp packet!!!\n";
+        p->RemoveHeader(icmpv4Header);
+      }else{
+        p->RemoveHeader(udpHeader);
+      }
+      DataHeader dataHeader0;
+      p->RemoveHeader(dataHeader0);
+
+      p->AddHeader (dataHeader);
+      if(id == icmpv4Header.GetTypeId()){
+        p->AddHeader(icmpv4Header);
+      }else{
+        p->AddHeader(udpHeader);
+      }
       
       UnicastForwardCallback ucb = queueEntry.GetUnicastForwardCallback ();
       Ipv4Header header = queueEntry.GetIpv4Header ();

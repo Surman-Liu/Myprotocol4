@@ -108,7 +108,7 @@ DataHeader::DataHeader (uint16_t dstPosx, uint16_t dstPosy, uint16_t dstPosz,
                         uint16_t dstVelx, uint16_t dstVely, uint16_t dstVelz, 
                         uint16_t dstSign, uint16_t dstTimestamp,
                         uint16_t recPosx, uint16_t recPosy, uint16_t recPosz, uint16_t inRec,
-                        uint64_t uid, uint16_t hop)
+                        uint64_t uid, uint16_t hop, uint16_t error)
   : m_dstPosx(dstPosx),
     m_dstPosy(dstPosy),
     m_dstPosz(dstPosz),
@@ -122,7 +122,8 @@ DataHeader::DataHeader (uint16_t dstPosx, uint16_t dstPosy, uint16_t dstPosz,
     m_recPosz (recPosz),
     m_inRec (inRec),
     m_uid(uid),
-    m_hop(hop)
+    m_hop(hop),
+    m_error(error)
 {
 }
 
@@ -142,11 +143,11 @@ DataHeader::GetInstanceTypeId () const
   return GetTypeId ();
 }
 
-// 数据头大小2*13 + 8*1 = 34
+// 数据头大小2*14 + 8*1 = 36
 uint32_t
 DataHeader::GetSerializedSize () const
 {
-  return 34;
+  return 36;
 }
 
 void
@@ -166,6 +167,7 @@ DataHeader::Serialize (Buffer::Iterator i) const
   i.WriteHtonU16 (m_inRec);
   i.WriteHtonU64 (m_uid);
   i.WriteHtonU16 (m_hop);
+  i.WriteHtonU16 (m_error);
 }
 
 uint32_t
@@ -186,6 +188,7 @@ DataHeader::Deserialize (Buffer::Iterator start)
   m_inRec = i.ReadNtohU16 ();
   m_uid = i.ReadNtohU64 ();
   m_hop = i.ReadNtohU16 ();
+  m_error = i.ReadNtohU16 ();
 
   uint32_t dist = i.GetDistanceFrom (start);
   NS_ASSERT (dist == GetSerializedSize ());
@@ -198,7 +201,7 @@ DataHeader::Print (std::ostream &os) const
   os << " length: " << GetSerializedSize()
      << " dstPositionX: "  << m_dstPosx
      << " dstPositionY: " << m_dstPosy
-     << " dstPositionZ: " << m_dstPosx
+     << " dstPositionZ: " << m_dstPosz
      << " dstVelocityX: " << m_dstVelx
      << " dstVelocityY: " << m_dstVely
      << " dstVelocityZ: " << m_dstVelz
@@ -209,7 +212,8 @@ DataHeader::Print (std::ostream &os) const
      << " RecPositionZ: " << m_recPosz
      << " inRec: " << m_inRec
      << " hop: "<<m_hop
-     << " uid: "<<m_uid;
+     << " uid: "<<m_uid
+     << " error: "<<m_error;
 }
 
 std::ostream &
@@ -226,7 +230,7 @@ DataHeader::operator== (DataHeader const & o) const
           m_dstVelx == o.m_dstVelx && m_dstVely == o.m_dstVely && m_dstVelz == o.m_dstVelz &&
           m_dstSign == o.m_dstSign && m_dstTimestamp == o.m_dstTimestamp &&
           m_recPosx == o.m_recPosx && m_recPosy == o.m_recPosy && m_recPosz == o.m_recPosz &&
-           m_inRec == o.m_inRec && m_uid == o.m_uid && m_hop == o.m_hop);
+           m_inRec == o.m_inRec && m_uid == o.m_uid && m_hop == o.m_hop && m_error == o.m_error);
 }
 }
 }

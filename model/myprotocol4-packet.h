@@ -115,7 +115,7 @@ public:
               uint16_t dstVelx = 0, uint16_t dstVely = 0, uint16_t dstVelz = 0, 
               uint16_t dstSign = 0, uint16_t dstTimestamp = 0, 
               uint16_t recPosx = 0, uint16_t recPosy = 0, uint16_t recPosz = 0, uint16_t inRec  = 0,
-              uint64_t uid = 0, uint16_t hop = 0);
+              uint64_t uid = 0, uint16_t hop = 0, uint16_t error = 0);
 
   static TypeId GetTypeId ();
   TypeId GetInstanceTypeId () const;
@@ -236,6 +236,14 @@ public:
   {
     return m_hop;
   }
+  void SetError (uint16_t error)
+  {
+    m_error = error;
+  }
+  uint16_t GetError () const
+  {
+    return m_error;
+  }
 
   bool operator== (DataHeader const & o) const;
 
@@ -256,6 +264,7 @@ private:
 
   uint64_t m_uid;
   uint16_t m_hop;
+  uint16_t m_error;
 };
 
 std::ostream & operator<< (std::ostream & os, DataHeader const & h);
