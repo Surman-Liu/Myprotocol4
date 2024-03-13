@@ -99,6 +99,9 @@ private:
   // ADD：扩大范围因子
   float m_scaleFactor;
 
+  // 控制包扩散的范围
+  uint16_t m_ttl;
+
   // ADD：位置服务，用来统计位置误差
   Ptr<LocationService> m_locationService;
 private:

@@ -130,7 +130,8 @@ RoutingProtocol::RoutingProtocol ()
     m_maxQueueTime (Seconds (30)),
     m_queue (m_maxQueueLen, m_maxQueueTime),
     m_transRange(250),
-    m_scaleFactor(1.5),
+    m_scaleFactor(0.5),
+    m_ttl(5),
     m_checkChangeTimer(Timer::CANCEL_ON_DESTROY)
 {
   m_uniformRandomVariable = CreateObject<UniformRandomVariable> ();
@@ -708,6 +709,14 @@ RoutingProtocol::RecvMyprotocol (Ptr<Socket> socket)
   );
   m_routingTable.Update(newEntry);
 
+  // 检查ttl
+  uint16_t ttl = myprotocolHeader.GetTtl() - 1;
+  if(ttl == 0){
+    return;
+  }
+
+  // ttl不为0，可以继续转发
+  myprotocolHeader.SetTtl(ttl);
   Ptr<Packet> p = Create<Packet> ();
   p->AddHeader(myprotocolHeader);
   for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j
@@ -890,6 +899,13 @@ RoutingProtocol::SendUpdate ()
   myprotocolHeader.SetTimestamp(m_lastSendTime);
   myprotocolHeader.SetMyadress(m_ipv4->GetAddress (1, 0).GetLocal ());
   myprotocolHeader.SetUid(packet->GetUid ());
+  myprotocolHeader.SetTtl(m_ttl);
+  // 下一次发送ttl需要修改
+  if(m_ttl == 5){
+    m_ttl = 2;
+  }else{
+    m_ttl = 5;
+  }
 
   packet->AddHeader (myprotocolHeader);
 

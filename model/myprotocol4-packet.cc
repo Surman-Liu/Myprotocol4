@@ -8,7 +8,7 @@ namespace myprotocol4 {
 NS_OBJECT_ENSURE_REGISTERED (MyprotocolHeader);
 
 MyprotocolHeader::MyprotocolHeader (uint16_t x, uint16_t y, uint16_t z, uint16_t vx, uint16_t vy, uint16_t vz, uint16_t sign, 
-                                    uint16_t timestamp, Ipv4Address myadress, uint64_t uid)
+                                    uint16_t timestamp, Ipv4Address myadress, uint64_t uid, uint16_t ttl)
   : m_x(x),
     m_y(y),
     m_z(z),
@@ -18,7 +18,8 @@ MyprotocolHeader::MyprotocolHeader (uint16_t x, uint16_t y, uint16_t z, uint16_t
     m_sign(sign),
     m_timestamp(timestamp),
     m_myadress(myadress),
-    m_uid(uid)
+    m_uid(uid),
+    m_ttl(ttl)
 {
 }
 
@@ -42,11 +43,11 @@ MyprotocolHeader::GetInstanceTypeId () const
   return GetTypeId ();
 }
 
-// 包头长度：8*1 + 4*1 + 2*8 = 28
+// 包头长度：8*1 + 4*1 + 2*9 = 30
 uint32_t
 MyprotocolHeader::GetSerializedSize () const
 {
-  return 28;
+  return 30;
 }
 
 void
@@ -62,6 +63,7 @@ MyprotocolHeader::Serialize (Buffer::Iterator i) const
   i.WriteHtonU16(m_sign);
   i.WriteHtonU16 (m_timestamp);
   i.WriteHtonU64 (m_uid);
+  i.WriteHtonU16(m_ttl);
   WriteTo (i, m_myadress);
 }
 
@@ -79,6 +81,7 @@ MyprotocolHeader::Deserialize (Buffer::Iterator start)
   m_sign = i.ReadNtohU16();
   m_timestamp = i.ReadNtohU16 ();
   m_uid = i.ReadNtohU64 ();
+  m_ttl = i.ReadNtohU16();
   ReadFrom (i, m_myadress);
 
   uint32_t dist = i.GetDistanceFrom (start);
@@ -99,7 +102,8 @@ MyprotocolHeader::Print (std::ostream &os) const
      << " sign: "<<m_sign
      << " timestamp: "<<m_timestamp
      << " myadress: "<<m_myadress
-     << " uid: "<<m_uid;
+     << " uid: "<<m_uid
+     << " ttl: "<<m_ttl;
 }
 
 NS_OBJECT_ENSURE_REGISTERED (DataHeader);
